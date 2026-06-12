@@ -12,6 +12,24 @@ type RoomView = {
   peerCount: number;
 };
 
+function shortId(len = 6): string {
+  const alphabet = "abcdefghijkmnopqrstuvwxyz23456789";
+  let s = "";
+  for (let i = 0; i < len; i++) {
+    s += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return s;
+}
+
+function roomUrl(r: { id: string; name: string; durationSec: number; startedAt: number }) {
+  const qs = new URLSearchParams({
+    n: r.name,
+    d: String(r.durationSec),
+    s: String(r.startedAt),
+  }).toString();
+  return `/room/${r.id}?${qs}`;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [pseudo, setPseudoState] = useState<string | null>(null);
@@ -20,7 +38,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [newName, setNewName] = useState("");
   const [newMinutes, setNewMinutes] = useState(25);
-  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     setPseudoState(getPseudo());
@@ -52,23 +69,13 @@ export default function HomePage() {
     setPseudoState(v);
   };
 
-  const createRoom = async (e: React.FormEvent) => {
+  const createRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    setCreating(true);
-    try {
-      const res = await fetch("/api/rooms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newName.trim() || "Study session",
-          durationSec: Math.max(1, Math.floor(newMinutes)) * 60,
-        }),
-      });
-      const data = await res.json();
-      if (data.room?.id) router.push(`/room/${data.room.id}`);
-    } finally {
-      setCreating(false);
-    }
+    const id = shortId();
+    const name = newName.trim() || "Study session";
+    const durationSec = Math.max(60, Math.floor(newMinutes) * 60);
+    const startedAt = Date.now();
+    router.push(roomUrl({ id, name, durationSec, startedAt }));
   };
 
   if (!pseudo) {
@@ -148,10 +155,9 @@ export default function HomePage() {
           </div>
           <button
             type="submit"
-            disabled={creating}
             className="px-5 py-2 rounded-lg bg-accent hover:brightness-110 font-medium"
           >
-            {creating ? "Création..." : "Créer & rejoindre"}
+            Créer & rejoindre
           </button>
         </form>
       </section>
@@ -194,7 +200,7 @@ export default function HomePage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => router.push(`/room/${r.id}`)}
+                  onClick={() => router.push(roomUrl(r))}
                   className="px-4 py-2 rounded-lg bg-accent hover:brightness-110 text-sm font-medium"
                 >
                   Rejoindre

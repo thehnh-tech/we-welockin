@@ -1,27 +1,34 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getPseudo } from "@/lib/cookies";
 import VideoTile from "@/components/VideoTile";
 import Timer from "@/components/Timer";
 
 type PeerInfo = { peerId: string; username: string; lastSeen: number };
-type RoomInfo = {
-  id: string;
-  name: string;
-  durationSec: number;
-  startedAt: number;
-  peerCount: number;
-};
+type RoomMeta = { name: string; durationSec: number; startedAt: number };
 
 export default function RoomPage() {
+  return (
+    <Suspense fallback={null}>
+      <RoomInner />
+    </Suspense>
+  );
+}
+
+function RoomInner() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const roomId = params.id;
   const router = useRouter();
 
+  const urlName = searchParams?.get("n") ?? null;
+  const urlDuration = searchParams?.get("d") ?? null;
+  const urlStartedAt = searchParams?.get("s") ?? null;
+
   const [pseudo, setPseudoState] = useState<string | null>(null);
-  const [room, setRoom] = useState<RoomInfo | null>(null);
+  const [room, setRoom] = useState<RoomMeta | null>(null);
   const [roomError, setRoomError] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -32,9 +39,10 @@ export default function RoomPage() {
   const [muted, setMuted] = useState(false);
   const [camOff, setCamOff] = useState(false);
 
-  const myPeerIdRef = useRef<string | null>(null);
+  const roomRef = useRef<RoomMeta | null>(null);
+  roomRef.current = room;
 
-  // 1. Read pseudo. Redirect home if absent.
+  // Read pseudo.
   useEffect(() => {
     const p = getPseudo();
     if (!p) {
@@ -44,34 +52,56 @@ export default function RoomPage() {
     setPseudoState(p);
   }, [router]);
 
-  // 2. Fetch room metadata.
+  // Resolve room metadata. URL params first, server fallback.
   useEffect(() => {
     if (!roomId) return;
+
+    // Try URL params.
+    if (urlName !== null && urlDuration !== null && urlStartedAt !== null) {
+      const d = parseInt(urlDuration, 10);
+      const s = parseInt(urlStartedAt, 10);
+      if (Number.isFinite(d) && Number.isFinite(s) && d >= 60) {
+        setRoom({
+          name: decodeURIComponent(urlName) || "Study session",
+          durationSec: d,
+          startedAt: s,
+        });
+        return;
+      }
+    }
+
+    // Fallback: ask the server.
     let alive = true;
-    const fetchRoom = async () => {
+    (async () => {
       try {
         const res = await fetch(`/api/rooms/${roomId}`, { cache: "no-store" });
         if (!res.ok) {
-          if (alive) setRoomError("Room introuvable");
+          if (alive)
+            setRoomError(
+              "Lien incomplet et room inconnue. Demande un lien complet à l'organisateur."
+            );
           return;
         }
         const data = await res.json();
-        if (alive) setRoom(data.room);
+        if (alive && data.room) {
+          setRoom({
+            name: data.room.name,
+            durationSec: data.room.durationSec,
+            startedAt: data.room.startedAt,
+          });
+        }
       } catch {
-        if (alive) setRoomError("Erreur réseau");
+        if (alive) setRoomError("Erreur réseau.");
       }
-    };
-    fetchRoom();
-    const t = setInterval(fetchRoom, 10000);
+    })();
     return () => {
       alive = false;
-      clearInterval(t);
     };
-  }, [roomId]);
+  }, [roomId, urlName, urlDuration, urlStartedAt]);
 
-  // 3. Set up media + PeerJS mesh. Runs once per room when pseudo known.
+  // Set up media + PeerJS mesh once room metadata is available.
   useEffect(() => {
-    if (!roomId || !pseudo) return;
+    if (!roomId || !pseudo || !room) return;
 
     let cancelled = false;
     let peer: any = null;
@@ -81,27 +111,37 @@ export default function RoomPage() {
     let stream: MediaStream | null = null;
     const activeCalls = new Map<string, any>();
     const peerUsernames = new Map<string, string>();
+    const peerLastSeen = new Map<string, number>();
+    const PEER_DROP_MS = 60_000;
 
     const announce = async () => {
       if (!myId) return;
+      const r = roomRef.current;
       try {
         await fetch(`/api/rooms/${roomId}/peers`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ peerId: myId, username: pseudo }),
+          body: JSON.stringify({
+            peerId: myId,
+            username: pseudo,
+            name: r?.name,
+            durationSec: r?.durationSec,
+            startedAt: r?.startedAt,
+          }),
+          keepalive: true,
         });
       } catch {}
     };
 
     const onPeers = (peers: PeerInfo[]) => {
       if (cancelled || !myId) return;
-      const seenIds = new Set(peers.map((p) => p.peerId));
+      const now = Date.now();
 
       for (const p of peers) {
         peerUsernames.set(p.peerId, p.username);
+        peerLastSeen.set(p.peerId, now);
       }
 
-      // Initiate calls to new peers only if my id < their id (deterministic).
       for (const p of peers) {
         if (p.peerId === myId) continue;
         if (activeCalls.has(p.peerId)) continue;
@@ -114,14 +154,17 @@ export default function RoomPage() {
         }
       }
 
-      // Drop calls to peers that disappeared.
+      // Drop calls only after sustained absence — a single missed poll from a
+      // serverless cold start should not tear down a healthy WebRTC connection.
       for (const peerId of Array.from(activeCalls.keys())) {
-        if (!seenIds.has(peerId)) {
+        const last = peerLastSeen.get(peerId) ?? 0;
+        if (last > 0 && now - last > PEER_DROP_MS) {
           const call = activeCalls.get(peerId);
           try {
             call?.close();
           } catch {}
           activeCalls.delete(peerId);
+          peerLastSeen.delete(peerId);
           setRemotes((prev) => {
             const next = new Map(prev);
             next.delete(peerId);
@@ -130,7 +173,6 @@ export default function RoomPage() {
         }
       }
 
-      // Update usernames on existing remotes.
       setRemotes((prev) => {
         let changed = false;
         const next = new Map(prev);
@@ -147,6 +189,7 @@ export default function RoomPage() {
 
     const attachCall = (call: any, remotePeerId: string) => {
       activeCalls.set(remotePeerId, call);
+      peerLastSeen.set(remotePeerId, Date.now());
 
       const meta = call.metadata as { username?: string } | undefined;
       if (meta?.username) peerUsernames.set(remotePeerId, meta.username);
@@ -187,7 +230,6 @@ export default function RoomPage() {
     };
 
     const init = async () => {
-      // Camera + mic.
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: { width: { ideal: 640 }, height: { ideal: 480 } },
@@ -209,7 +251,6 @@ export default function RoomPage() {
       }
       setLocalStream(stream);
 
-      // PeerJS.
       const PeerModule = await import("peerjs");
       const Peer = PeerModule.default;
       if (cancelled) return;
@@ -232,7 +273,6 @@ export default function RoomPage() {
           return;
         }
         myId = id;
-        myPeerIdRef.current = id;
         setConnected(true);
         announce();
         poll();
@@ -285,9 +325,8 @@ export default function RoomPage() {
         } catch {}
       }
     };
-  }, [roomId, pseudo]);
+  }, [roomId, pseudo, room]);
 
-  // Toggle mic.
   const toggleMute = () => {
     if (!localStream) return;
     const next = !muted;
@@ -295,7 +334,6 @@ export default function RoomPage() {
     setMuted(next);
   };
 
-  // Toggle cam.
   const toggleCam = () => {
     if (!localStream) return;
     const next = !camOff;
@@ -313,15 +351,12 @@ export default function RoomPage() {
     } catch {}
   };
 
-  const remotesList = useMemo(
-    () => Array.from(remotes.entries()),
-    [remotes]
-  );
+  const remotesList = useMemo(() => Array.from(remotes.entries()), [remotes]);
 
   if (roomError) {
     return (
       <main className="min-h-screen flex items-center justify-center p-6">
-        <div className="text-center">
+        <div className="text-center max-w-sm">
           <p className="text-lg mb-4">{roomError}</p>
           <button
             onClick={() => router.push("/")}

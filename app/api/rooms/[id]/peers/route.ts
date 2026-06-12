@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listPeers, removePeer, upsertPeer } from "@/lib/store";
+import { announce, listPeers, removePeer } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -10,9 +10,6 @@ export async function GET(
 ) {
   const { id } = await params;
   const peers = listPeers(id);
-  if (!peers) {
-    return NextResponse.json({ error: "Room not found" }, { status: 404 });
-  }
   return NextResponse.json({ peers });
 }
 
@@ -21,22 +18,39 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  let body: { peerId?: string; username?: string };
+  let body: {
+    peerId?: string;
+    username?: string;
+    name?: string;
+    durationSec?: number;
+    startedAt?: number;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
   const peerId = (body.peerId ?? "").toString();
-  const username = (body.username ?? "").toString();
   if (!peerId) {
     return NextResponse.json({ error: "peerId required" }, { status: 400 });
   }
-  const res = upsertPeer(id, peerId, username);
-  if (!res.ok) {
-    return NextResponse.json({ error: "Room not found" }, { status: 404 });
-  }
-  return NextResponse.json({ peers: res.peers });
+  const { peers, room } = announce({
+    roomId: id,
+    peerId,
+    username: (body.username ?? "").toString(),
+    name: body.name,
+    durationSec: body.durationSec,
+    startedAt: body.startedAt,
+  });
+  return NextResponse.json({
+    peers,
+    room: {
+      id: room.id,
+      name: room.name,
+      durationSec: room.durationSec,
+      startedAt: room.startedAt,
+    },
+  });
 }
 
 export async function DELETE(
