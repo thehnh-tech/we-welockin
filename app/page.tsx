@@ -73,7 +73,10 @@ export default function HomePage() {
     e.preventDefault();
     const id = shortId();
     const name = newName.trim() || "Study session";
-    const durationSec = Math.max(60, Math.floor(newMinutes) * 60);
+    // Guard against an empty/NaN minutes field (would propagate ?d=NaN).
+    const minutes =
+      Number.isFinite(newMinutes) && newMinutes > 0 ? Math.floor(newMinutes) : 25;
+    const durationSec = Math.max(60, Math.min(8 * 3600, minutes * 60));
     const startedAt = Date.now();
     router.push(roomUrl({ id, name, durationSec, startedAt }));
   };
@@ -177,6 +180,8 @@ export default function HomePage() {
               }
             }}
             className="text-sm text-white/60 hover:text-white"
+            aria-label="Rafraîchir la liste des rooms"
+            title="Rafraîchir"
           >
             {loading ? "..." : "↻"}
           </button>

@@ -44,14 +44,22 @@ export function announce(input: {
 }): { peers: Peer[]; room: Room } {
   let room = store.rooms.get(input.roomId);
   if (!room) {
+    const now = Date.now();
+    const rawDuration = Math.floor(input.durationSec ?? 1500);
+    const durationSec = Number.isFinite(rawDuration)
+      ? Math.max(60, Math.min(8 * 3600, rawDuration))
+      : 1500;
+    // Clamp startedAt into [now - durationSec, now]: never in the future, and
+    // never so far in the past that the timer is nonsensically negative.
+    const rawStarted = Math.floor(input.startedAt ?? now);
+    const startedAt = Number.isFinite(rawStarted)
+      ? Math.min(now, Math.max(now - durationSec * 1000, rawStarted))
+      : now;
     room = {
       id: input.roomId,
       name: (input.name ?? "").slice(0, 60) || "Study session",
-      durationSec: Math.max(
-        60,
-        Math.min(8 * 3600, Math.floor(input.durationSec ?? 1500))
-      ),
-      startedAt: Math.floor(input.startedAt ?? Date.now()),
+      durationSec,
+      startedAt,
       peers: new Map(),
     };
     store.rooms.set(input.roomId, room);

@@ -5,6 +5,8 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getPseudo } from "@/lib/cookies";
 import VideoTile from "@/components/VideoTile";
 import Timer from "@/components/Timer";
+import type PeerJS from "peerjs";
+import type { MediaConnection } from "peerjs";
 
 type PeerInfo = { peerId: string; username: string; lastSeen: number };
 type RoomMeta = { name: string; durationSec: number; startedAt: number };
@@ -38,6 +40,7 @@ function RoomInner() {
   >(new Map());
   const [muted, setMuted] = useState(false);
   const [camOff, setCamOff] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const roomRef = useRef<RoomMeta | null>(null);
   roomRef.current = room;
@@ -104,21 +107,23 @@ function RoomInner() {
     if (!roomId || !pseudo || !room) return;
 
     let cancelled = false;
-    let peer: any = null;
+    let peer: PeerJS | null = null;
     let myId: string | null = null;
-    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let refreshTimer: ReturnType<typeof setInterval> | null = null;
     let stream: MediaStream | null = null;
-    const activeCalls = new Map<string, any>();
+    const activeCalls = new Map<string, MediaConnection>();
     const peerUsernames = new Map<string, string>();
     const peerLastSeen = new Map<string, number>();
     const PEER_DROP_MS = 60_000;
+    const REFRESH_MS = 4_000;
 
+    // One round-trip does double duty: it refreshes our presence (heartbeat) and
+    // returns the current peer list, so there is no separate poll loop.
     const announce = async () => {
       if (!myId) return;
       const r = roomRef.current;
       try {
-        await fetch(`/api/rooms/${roomId}/peers`, {
+        const res = await fetch(`/api/rooms/${roomId}/peers`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -128,8 +133,10 @@ function RoomInner() {
             durationSec: r?.durationSec,
             startedAt: r?.startedAt,
           }),
-          keepalive: true,
         });
+        if (!res.ok) return;
+        const data = await res.json();
+        onPeers(data.peers ?? []);
       } catch {}
     };
 
@@ -187,7 +194,7 @@ function RoomInner() {
       });
     };
 
-    const attachCall = (call: any, remotePeerId: string) => {
+    const attachCall = (call: MediaConnection, remotePeerId: string) => {
       activeCalls.set(remotePeerId, call);
       peerLastSeen.set(remotePeerId, Date.now());
 
@@ -215,18 +222,6 @@ function RoomInner() {
       call.on("error", () => {
         activeCalls.delete(remotePeerId);
       });
-    };
-
-    const poll = async () => {
-      if (!myId) return;
-      try {
-        const res = await fetch(`/api/rooms/${roomId}/peers`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        onPeers(data.peers ?? []);
-      } catch {}
     };
 
     const init = async () => {
@@ -265,28 +260,26 @@ function RoomInner() {
         },
       });
 
-      peer.on("open", (id: string) => {
+      peer.on("open", (id) => {
         if (cancelled) {
           try {
-            peer.destroy();
+            peer?.destroy();
           } catch {}
           return;
         }
         myId = id;
         setConnected(true);
         announce();
-        poll();
-        heartbeatTimer = setInterval(announce, 5000);
-        pollTimer = setInterval(poll, 3000);
+        refreshTimer = setInterval(announce, REFRESH_MS);
       });
 
-      peer.on("call", (call: any) => {
+      peer.on("call", (call) => {
         if (cancelled || !stream) return;
         call.answer(stream);
         attachCall(call, call.peer);
       });
 
-      peer.on("error", (err: any) => {
+      peer.on("error", (err) => {
         console.error("PeerJS error", err);
       });
 
@@ -301,8 +294,7 @@ function RoomInner() {
 
     return () => {
       cancelled = true;
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
-      if (pollTimer) clearInterval(pollTimer);
+      if (refreshTimer) clearInterval(refreshTimer);
       for (const call of activeCalls.values()) {
         try {
           call.close();
@@ -346,8 +338,25 @@ function RoomInner() {
   };
 
   const copyLink = async () => {
+    const url = window.location.href;
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        // Fallback for non-secure contexts (e.g. LAN over HTTP) where the
+        // async Clipboard API is unavailable.
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
     } catch {}
   };
 
@@ -362,7 +371,7 @@ function RoomInner() {
             onClick={() => router.push("/")}
             className="px-4 py-2 rounded-lg bg-accent"
           >
-            Retour à l'accueil
+            Retour à l&apos;accueil
           </button>
         </div>
       </main>
@@ -407,10 +416,14 @@ function RoomInner() {
         <div className="flex items-center gap-2">
           <button
             onClick={copyLink}
-            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
-            title="Copier le lien"
+            className={`px-3 py-1.5 rounded-lg text-sm ${
+              copied
+                ? "bg-emerald-500/80"
+                : "bg-white/10 hover:bg-white/20"
+            }`}
+            title="Copier le lien d'invitation"
           >
-            Inviter
+            {copied ? "Lien copié !" : "Inviter"}
           </button>
           <button
             onClick={leave}
@@ -447,19 +460,23 @@ function RoomInner() {
       <footer className="px-6 py-4 border-t border-white/5 flex items-center justify-center gap-3">
         <button
           onClick={toggleMute}
+          aria-pressed={muted}
+          aria-label={muted ? "Réactiver le micro" : "Couper le micro"}
           className={`px-4 py-2 rounded-lg text-sm font-medium ${
             muted ? "bg-red-500/80" : "bg-white/10 hover:bg-white/20"
           }`}
         >
-          {muted ? "Micro coupé" : "Micro"}
+          {muted ? "🔇 Micro coupé" : "🎤 Micro"}
         </button>
         <button
           onClick={toggleCam}
+          aria-pressed={camOff}
+          aria-label={camOff ? "Réactiver la caméra" : "Couper la caméra"}
           className={`px-4 py-2 rounded-lg text-sm font-medium ${
             camOff ? "bg-red-500/80" : "bg-white/10 hover:bg-white/20"
           }`}
         >
-          {camOff ? "Caméra coupée" : "Caméra"}
+          {camOff ? "📷 Caméra coupée" : "📹 Caméra"}
         </button>
       </footer>
     </main>

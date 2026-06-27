@@ -49,7 +49,7 @@ For a robust production setup, swap `lib/store.ts` for **Upstash Redis** or
 **Vercel KV**:
 
 - Each room → a hash with metadata + a sorted set of `peerId -> lastSeen`.
-- Cleanup happens lazily on each read (drop entries older than 15s).
+- Cleanup happens lazily on each read (drop entries older than 30s).
 
 ## Limits
 
