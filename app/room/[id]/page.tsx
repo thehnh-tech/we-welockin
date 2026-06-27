@@ -211,16 +211,22 @@ function RoomInner() {
         });
       });
       call.on("close", () => {
+        // Only retract state if THIS call is still the active one — a stale
+        // call closing must not evict a fresher call that replaced it.
+        if (activeCalls.get(remotePeerId) !== call) return;
         activeCalls.delete(remotePeerId);
         if (cancelled) return;
         setRemotes((prev) => {
+          if (activeCalls.has(remotePeerId)) return prev;
           const next = new Map(prev);
           next.delete(remotePeerId);
           return next;
         });
       });
       call.on("error", () => {
-        activeCalls.delete(remotePeerId);
+        if (activeCalls.get(remotePeerId) === call) {
+          activeCalls.delete(remotePeerId);
+        }
       });
     };
 
@@ -275,6 +281,14 @@ function RoomInner() {
 
       peer.on("call", (call) => {
         if (cancelled || !stream) return;
+        // If we already hold a call for this peer, the inbound one is the
+        // fresher attempt (e.g. after a reconnect): close the old, keep the new.
+        const existing = activeCalls.get(call.peer);
+        if (existing && existing !== call) {
+          try {
+            existing.close();
+          } catch {}
+        }
         call.answer(stream);
         attachCall(call, call.peer);
       });

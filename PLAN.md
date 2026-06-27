@@ -52,22 +52,23 @@ se faire avant ou en parallèle. La Phase 4 idéalement avant la Phase 5 (sinon 
 
 ---
 
-## Phase 1 — Bugs medium (~0,5 j)
+## Phase 1 — Bugs medium (~0,5 j) ✅ FAIT (branche `phase-0-quick-wins`)
 
 **Objectif :** corriger les défauts visibles dès qu'il y a 2+ participants.
 
-- [ ] **#3 `hasVideo` figé (caméra distante off)** — `components/VideoTile.tsx:30`.
-      Passer `hasVideo` en `useState`, et dans un `useEffect` s'abonner aux events de la piste
-      vidéo (`mute`, `unmute`, `ended`) + recomputer. Aujourd'hui une caméra distante coupée
-      laisse une vidéo gelée au lieu du placeholder.
-- [ ] **#4 Calls dupliqués / tuile fantôme** — `app/room/[id]/page.tsx:283`.
-      Dans `peer.on("call")`, ajouter la garde `if (activeCalls.has(call.peer)) { ... }` (comme le
-      chemin sortant). Dans le handler `close` (`:206`), ne supprimer que si c'est bien le call
-      courant : `if (activeCalls.get(id) === call) activeCalls.delete(id)`. Évite qu'un call
-      orphelin ferme la connexion vivante (tuile d'un pair connecté qui disparaît jusqu'à 60 s).
+- [x] **#3 `hasVideo` figé (caméra distante off)** — `components/VideoTile.tsx`.
+      Détection corrigée en `enabled && !muted && live` (le `muted` du receveur est le seul signal
+      d'une caméra distante coupée ; `enabled` ne couvrait que le cas local). Re-render déclenché par
+      un `useEffect` abonné aux events `mute`/`unmute`/`ended` + `addtrack`/`removetrack`.
+- [x] **#4 Calls dupliqués / tuile fantôme** — `app/room/[id]/page.tsx`.
+      `peer.on("call")` : si un call existe déjà pour ce pair, on ferme l'ancien et on garde le
+      nouveau (= attempt le plus frais, gère la reconnexion sans rejeter). Handlers `close`/`error`
+      gardés par identité (`activeCalls.get(id) === call`) : un call obsolète ne peut plus évincer
+      le call vivant ni retirer une tuile saine.
 
-**Validation :** test manuel 2 onglets — couper la caméra d'un côté affiche l'avatar de l'autre côté ;
-rejoindre/recharger un pair ne fait pas disparaître une tuile saine.
+**Validation :** ✅ `tsc`, `eslint`, `next build`. Scénarios tracés (connexion normale, caméra
+distante off, reconnexion avec doublon, erreur sur call obsolète) — état final correct quel que soit
+le timing des events. *(Test manuel 2 navigateurs avec caméra recommandé avant merge.)*
 
 ---
 

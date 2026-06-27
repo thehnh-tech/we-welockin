@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   stream: MediaStream | null;
@@ -18,6 +18,10 @@ export default function VideoTile({
   isLocal = false,
 }: Props) {
   const ref = useRef<HTMLVideoElement>(null);
+  // Bumped on track mute/unmute/ended so `hasVideo` (derived below) is
+  // recomputed — a remote peer toggling their camera only surfaces through
+  // these events, never through a prop change.
+  const [, bump] = useState(0);
 
   useEffect(() => {
     if (ref.current && stream) {
@@ -27,9 +31,35 @@ export default function VideoTile({
     }
   }, [stream]);
 
+  useEffect(() => {
+    if (!stream) return;
+    const rerender = () => bump((n) => n + 1);
+    const tracks = stream.getVideoTracks();
+    for (const t of tracks) {
+      t.addEventListener("mute", rerender);
+      t.addEventListener("unmute", rerender);
+      t.addEventListener("ended", rerender);
+    }
+    stream.addEventListener("addtrack", rerender);
+    stream.addEventListener("removetrack", rerender);
+    return () => {
+      for (const t of tracks) {
+        t.removeEventListener("mute", rerender);
+        t.removeEventListener("unmute", rerender);
+        t.removeEventListener("ended", rerender);
+      }
+      stream.removeEventListener("addtrack", rerender);
+      stream.removeEventListener("removetrack", rerender);
+    };
+  }, [stream]);
+
+  // `enabled` covers the local case (we flip it when toggling our own camera);
+  // `!muted` covers the remote case (the receiver's track goes muted when the
+  // sender disables theirs, while `enabled` stays true).
   const hasVideo =
-    stream?.getVideoTracks().some((t) => t.enabled && t.readyState === "live") ??
-    false;
+    stream
+      ?.getVideoTracks()
+      .some((t) => t.enabled && !t.muted && t.readyState === "live") ?? false;
 
   return (
     <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-white/10 shadow-lg">
