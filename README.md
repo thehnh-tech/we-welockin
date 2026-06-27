@@ -64,6 +64,10 @@ rate-limited per IP when Redis is configured.
 - Mesh WebRTC tops out around 5-6 participants. Beyond that, switch to an SFU
   (LiveKit Cloud has a generous free tier and a drop-in React SDK).
 - PeerJS's default cloud broker is rate-limited. For heavy use, self-host
-  `peerjs-server` and pass `host/port/path` to `new Peer()`.
-- Some users behind symmetric NATs (corporate/cellular) may fail to connect
-  without TURN servers. Free TURN: [Open Relay Project](https://www.metered.ca/tools/openrelay/).
+  `peerjs-server` and set `NEXT_PUBLIC_PEER_HOST/PORT/PATH/SECURE` (see
+  `.env.example`); they feed `lib/rtc-config.ts`.
+- Some users behind symmetric NATs (corporate/cellular) fail to connect with
+  STUN alone. Set `NEXT_PUBLIC_TURN_URL/USERNAME/CREDENTIAL` to add a TURN
+  server — free credentials at the
+  [Open Relay Project](https://www.metered.ca/tools/openrelay/). The room shows
+  a hint banner if others are present but no media connection establishes.

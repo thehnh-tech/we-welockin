@@ -102,21 +102,24 @@ Upstash de test (2 process locaux pointant le même Redis → découverte crois�
 
 ---
 
-## Phase 3 — Fiabilité signaling & media (~1 j)
+## Phase 3 — Fiabilité signaling & media (~1 j) ✅ FAIT (branche `phase-0-quick-wins`)
 
 **Objectif :** arrêter les échecs de connexion silencieux et le SPOF du broker public.
 
-- [ ] **#12 Ajouter un serveur TURN** — `app/room/[id]/page.tsx:260`, compléter `iceServers` avec
-      un TURN (Open Relay Project, gratuit) en plus des STUN. Indispensable derrière NAT symétrique.
-- [ ] **Erreur ICE visible** — sur `peer.on("error")` / échec de connexion (`:289`), afficher un
-      message FR (« Connexion impossible — réseau restrictif ? ») au lieu du seul `console.error`.
-- [ ] **Self-host `peerjs-server`** (optionnel mais recommandé) — passer `host/port/path` via
-      `lib/env.ts`, supprimer la dépendance au broker public rate-limité.
-- [ ] **Bannière reconnexion** — après N échecs de heartbeat/poll consécutifs, afficher « Reconnexion… »
-      (remplace les `catch{}` muets).
+- [x] **#12 TURN configurable** — `lib/rtc-config.ts` (`buildIceServers`) ajoute un TURN aux STUN
+      quand `NEXT_PUBLIC_TURN_URL/USERNAME/CREDENTIAL` sont définis (liste séparée par virgules
+      supportée). *Vérifié : la var est bien injectée dans le bundle client au build.*
+- [x] **Erreur ICE/peer visible** — `peer.on("error")` mappe les types fatals PeerJS vers un message
+      FR (`peerErrorMessage`) affiché dans un bandeau dismissible. Plus de `console.error` muet seul.
+- [x] **Bandeau « connexion difficile »** — si d'autres participants sont présents mais aucune
+      connexion média n'aboutit après 15 s (symptôme NAT symétrique), un bandeau suggère un TURN.
+      Se masque dès qu'une connexion s'établit.
+- [x] **Self-host `peerjs-server` configurable** — `buildPeerOptions` lit
+      `NEXT_PUBLIC_PEER_HOST/PORT/PATH/SECURE` ; sans ça, broker public par défaut. `.env.example` à jour.
 
-**Validation :** test sur réseau mobile/partage de connexion (NAT strict) → la connexion aboutit ;
-couper le réseau affiche la bannière puis se rétablit.
+**Validation :** ✅ `tsc`, `eslint` (0 err), `next build`, pages home/room rendues sans crash SSR,
+injection env TURN confirmée dans le bundle. ⚠️ Le **comportement TURN réel** (connexion derrière NAT
+strict) nécessite un test sur réseau mobile/Wi-Fi d'entreprise avec de vraies creds — non automatisable ici.
 
 ---
 

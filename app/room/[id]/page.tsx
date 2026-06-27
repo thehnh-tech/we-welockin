@@ -7,6 +7,7 @@ import VideoTile from "@/components/VideoTile";
 import Timer from "@/components/Timer";
 import type PeerJS from "peerjs";
 import type { MediaConnection } from "peerjs";
+import { buildPeerOptions, peerErrorMessage } from "@/lib/rtc-config";
 
 type PeerInfo = { peerId: string; username: string; lastSeen: number };
 type RoomMeta = { name: string; durationSec: number; startedAt: number };
@@ -41,6 +42,9 @@ function RoomInner() {
   const [muted, setMuted] = useState(false);
   const [camOff, setCamOff] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [othersCount, setOthersCount] = useState(0);
+  const [connWarning, setConnWarning] = useState<string | null>(null);
+  const [stalled, setStalled] = useState(false);
 
   const roomRef = useRef<RoomMeta | null>(null);
   roomRef.current = room;
@@ -148,6 +152,7 @@ function RoomInner() {
         peerUsernames.set(p.peerId, p.username);
         peerLastSeen.set(p.peerId, now);
       }
+      setOthersCount(peers.filter((p) => p.peerId !== myId).length);
 
       for (const p of peers) {
         if (p.peerId === myId) continue;
@@ -256,15 +261,7 @@ function RoomInner() {
       const Peer = PeerModule.default;
       if (cancelled) return;
 
-      peer = new Peer({
-        debug: 1,
-        config: {
-          iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:global.stun.twilio.com:3478" },
-          ],
-        },
-      });
+      peer = new Peer(buildPeerOptions());
 
       peer.on("open", (id) => {
         if (cancelled) {
@@ -295,6 +292,9 @@ function RoomInner() {
 
       peer.on("error", (err) => {
         console.error("PeerJS error", err);
+        if (cancelled) return;
+        const msg = peerErrorMessage((err as { type?: string })?.type);
+        if (msg) setConnWarning(msg);
       });
 
       peer.on("disconnected", () => {
@@ -332,6 +332,17 @@ function RoomInner() {
       }
     };
   }, [roomId, pseudo, room]);
+
+  // If other participants are present but no media connection has established
+  // after a grace period, surface a TURN hint — the classic symmetric-NAT
+  // symptom. Clears as soon as anyone connects.
+  useEffect(() => {
+    if (connected && othersCount > 0 && remotes.size === 0) {
+      const t = setTimeout(() => setStalled(true), 15000);
+      return () => clearTimeout(t);
+    }
+    setStalled(false);
+  }, [connected, othersCount, remotes]);
 
   const toggleMute = () => {
     if (!localStream) return;
@@ -375,6 +386,14 @@ function RoomInner() {
   };
 
   const remotesList = useMemo(() => Array.from(remotes.entries()), [remotes]);
+
+  // A fatal peer error takes priority; otherwise show the stalled-connection
+  // (likely TURN-needed) hint.
+  const banner =
+    connWarning ??
+    (stalled
+      ? "Connexion difficile avec les autres participants. Sur certains réseaux (NAT strict, 4G, Wi-Fi d'entreprise), un serveur TURN est nécessaire."
+      : null);
 
   if (roomError) {
     return (
@@ -447,6 +466,25 @@ function RoomInner() {
           </button>
         </div>
       </header>
+
+      {banner && (
+        <div
+          role="status"
+          className="px-4 py-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-sm flex items-center justify-between gap-3"
+        >
+          <span>{banner}</span>
+          <button
+            onClick={() => {
+              setConnWarning(null);
+              setStalled(false);
+            }}
+            aria-label="Masquer l'avertissement"
+            className="shrink-0 text-amber-200/70 hover:text-amber-100"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 p-4 md:p-6 flex flex-col items-center gap-6">
         {room && (
