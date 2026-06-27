@@ -33,23 +33,31 @@ test with friends, deploy to Vercel.
 npx vercel
 ```
 
-No environment variables required. Just push and it works.
+Works with no env vars (in-memory fallback), but for a real deployment set up
+the shared store below.
 
-### Caveat: in-memory rooms store
+### Rooms store: in-memory fallback vs Redis
 
-The list of rooms is held in a `globalThis` map inside the Next.js server
-process. On Vercel this means each serverless instance has its own copy, so two
-users hitting different instances may not see the same room list. Joining a
-room directly by URL (e.g. shared via "Inviter") still works because each
-client polls the same `/api/rooms/[id]/peers` route which lives on a single
-function invocation chain per request — but presence may flicker between
-instances.
+The store lives behind a small async adapter (`lib/store/`) with two backends,
+selected automatically at startup:
 
-For a robust production setup, swap `lib/store.ts` for **Upstash Redis** or
-**Vercel KV**:
+- **In-memory** (`memory.ts`) — used when no Redis credentials are present. A
+  `globalThis` map inside the Next.js process. Fine for local dev / a single
+  long-lived instance, but on Vercel each serverless instance has its own copy,
+  so two users on different instances may not discover each other.
+- **Redis** (`redis.ts`) — used when Upstash/KV credentials are set. Shared
+  across all instances, so discovery and presence are correct in production.
+  Schema (prefix `wlis:`): `room:{id}` hash (metadata, TTL), `room:{id}:peers`
+  sorted set `peerId -> lastSeen` (TTL), `room:{id}:names` hash, and a global
+  `rooms` sorted set for discovery. Stale peers are dropped lazily on each read
+  (older than 30s); abandoned rooms expire via key TTL.
 
-- Each room → a hash with metadata + a sorted set of `peerId -> lastSeen`.
-- Cleanup happens lazily on each read (drop entries older than 30s).
+To enable Redis, copy `.env.example` to `.env.local` and fill in a free
+[Upstash](https://upstash.com) database's REST URL + token (Vercel KV names
+also work). On Vercel, add the same vars in the project settings.
+
+Mutating routes (`POST`/`DELETE /api/rooms/[id]/peers`) are body-size capped and
+rate-limited per IP when Redis is configured.
 
 ## Limits
 

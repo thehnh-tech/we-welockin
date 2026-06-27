@@ -72,28 +72,33 @@ le timing des events. *(Test manuel 2 navigateurs avec caméra recommandé avant
 
 ---
 
-## Phase 2 — Store partagé Redis/KV (~1–2 j) — **CRITIQUE**
+## Phase 2 — Store partagé Redis/KV (~1–2 j) — **CRITIQUE** ✅ FAIT (branche `phase-0-quick-wins`)
 
 **Objectif :** que la découverte de rooms et la présence fonctionnent à travers plusieurs
 instances serverless (aujourd'hui `globalThis` casse tout dès la 2ᵉ Lambda).
 
-- [ ] Provisionner **Upstash Redis** (ou Vercel KV) — gratuit, REST, compatible edge.
-- [ ] Introduire `lib/env.ts` (validation **zod**) + `.env.example` (`REDIS_URL`, `REDIS_TOKEN`).
-- [ ] Réécrire `lib/store.ts` derrière la **même interface** (`getRoom`, `listActiveRooms`,
-      `announce`, `removePeer`, `listPeers`, `roomPublicView`) — un simple swap d'implémentation.
-      Schéma proposé :
-      - `room:{id}` → hash `{ name, durationSec, startedAt }`, TTL d'inactivité (~2 min)
-      - `room:{id}:peers` → **sorted set** `peerId → lastSeen` (score), nettoyage lazy `< now-60s`
-      - `rooms:index` → sorted set des rooms actives (score = `startedAt`) pour `listActiveRooms`
-- [ ] **#11** En conséquence : ne plus détruire la room au départ du dernier peer — laisser le TTL gérer.
-- [ ] **DoS / mémoire (#15)** : ajouter un cap global de rooms + cap peers/room, et un
-      **rate-limit par IP** sur `POST/DELETE` (Upstash Ratelimit). Borner la taille du body JSON
-      (`peers/route.ts:29`) et la longueur de `peerId`/`roomId`.
-- [ ] Renvoyer `serverNow` dans la réponse announce → corrige proprement le **skew d'horloge** du
-      timer (le joiner calcule `remaining` à partir de l'horloge serveur, pas la sienne).
+- [x] **Adapter à 2 backends** — `lib/store/` : interface async unique (`types.ts`),
+      `memory.ts` (fallback process-local) et `redis.ts` (Upstash), sélectionnés au démarrage selon
+      la présence des credentials (`lib/env.ts`). `.env.example` fourni. Pas de zod (2 strings →
+      validation manuelle, zéro dépendance en plus).
+- [x] **Schéma Redis** — `wlis:room:{id}` (hash méta, TTL), `wlis:room:{id}:peers` (sorted set
+      `peerId→lastSeen`, TTL), `wlis:room:{id}:names` (hash), `wlis:rooms` (index découverte).
+      Nettoyage lazy des pairs périmés (>30 s) à chaque lecture ; rooms abandonnées expirent par TTL.
+- [x] **#11 corrigé** — plus de destruction de room au départ du dernier pair : in-memory garde une
+      fenêtre de grâce (`ROOM_GRACE_MS`), Redis s'appuie sur le TTL. *Vérifié : un lien direct marche
+      encore après le départ de tous les pairs.*
+- [x] **DoS / caps** — cap global rooms (`MAX_ROOMS`), cap peers/room (`MAX_PEERS_PER_ROOM`),
+      body JSON borné (413 au-delà de 4 Ko), `peerId`/`roomId`/noms tronqués + caractères de contrôle
+      retirés, rate-limit par IP sur POST/DELETE (actif uniquement avec Redis, généreux).
+- [x] **Routes async + dédup** — les 4 handlers passent en `await` ; le shaping `room` dupliqué
+      (`roomPublicView` vs inline) est supprimé (`announce` renvoie déjà la méta publique).
+- [ ] **À faire (reporté)** : renvoyer `serverNow` pour corriger le **skew d'horloge** du timer
+      (petit, low) — pas inclus ici pour garder le diff focalisé sur le store.
 
-**Validation :** `vercel dev` ou 2 process locaux pointant le même Redis → un user voit la room créée
-par l'autre ; un redeploy ne perd pas les rooms actives ; flood d'ids uniques ne fait pas croître la mémoire.
+**Validation :** ✅ `tsc`, `eslint`, `next build`. ✅ Smoke test complet du backend in-memory
+(découverte sans poll, getRoom, grâce #11, caps 413/400, sanitization, clamps, RL no-op).
+⚠️ **Le backend Redis est typé + revu mais PAS testé sur une instance réelle** — à valider avec un
+Upstash de test (2 process locaux pointant le même Redis → découverte croisée OK) avant prod.
 
 ---
 
