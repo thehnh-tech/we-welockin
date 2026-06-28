@@ -1,20 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { formatClock } from "@/lib/time";
 
 type Props = {
   startedAt: number;
   durationSec: number;
 };
-
-function format(seconds: number): string {
-  const abs = Math.max(0, Math.floor(seconds));
-  const h = Math.floor(abs / 3600);
-  const m = Math.floor((abs % 3600) / 60);
-  const s = abs % 60;
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-}
 
 // A short two-note chime synthesized via WebAudio — no asset to ship.
 function playChime() {
@@ -133,7 +125,9 @@ export default function Timer({ startedAt, durationSec }: Props) {
         className="relative w-56 h-56 md:w-72 md:h-72"
         role="timer"
         aria-label={
-          finished ? "Session terminée" : `Temps restant : ${format(remainingSec)}`
+          finished
+            ? "Session terminée"
+            : `Temps restant : ${formatClock(remainingSec)}`
         }
       >
         <svg
@@ -167,7 +161,7 @@ export default function Timer({ startedAt, durationSec }: Props) {
             className="font-mono text-4xl md:text-5xl font-bold tabular-nums"
             aria-hidden="true"
           >
-            {finished ? "00:00" : format(remainingSec)}
+            {finished ? "00:00" : formatClock(remainingSec)}
           </div>
           <div
             className="mt-2 text-xs uppercase tracking-widest text-white/50"

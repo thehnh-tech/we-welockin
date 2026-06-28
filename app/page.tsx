@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getPseudo, setPseudo, clearPseudo } from "@/lib/cookies";
+import { buildRoomUrl } from "@/lib/roomLink";
+import { ROOMS_POLL_MS } from "@/lib/constants";
 
 type RoomView = {
   id: string;
@@ -19,15 +21,6 @@ function shortId(len = 6): string {
     s += alphabet[Math.floor(Math.random() * alphabet.length)];
   }
   return s;
-}
-
-function roomUrl(r: { id: string; name: string; durationSec: number; startedAt: number }) {
-  const qs = new URLSearchParams({
-    n: r.name,
-    d: String(r.durationSec),
-    s: String(r.startedAt),
-  }).toString();
-  return `/room/${r.id}?${qs}`;
 }
 
 export default function HomePage() {
@@ -54,7 +47,7 @@ export default function HomePage() {
       } catch {}
     };
     fetchRooms();
-    const t = setInterval(fetchRooms, 4000);
+    const t = setInterval(fetchRooms, ROOMS_POLL_MS);
     return () => {
       alive = false;
       clearInterval(t);
@@ -78,7 +71,7 @@ export default function HomePage() {
       Number.isFinite(newMinutes) && newMinutes > 0 ? Math.floor(newMinutes) : 25;
     const durationSec = Math.max(60, Math.min(8 * 3600, minutes * 60));
     const startedAt = Date.now();
-    router.push(roomUrl({ id, name, durationSec, startedAt }));
+    router.push(buildRoomUrl({ id, name, durationSec, startedAt }));
   };
 
   if (!pseudo) {
@@ -205,7 +198,7 @@ export default function HomePage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => router.push(roomUrl(r))}
+                  onClick={() => router.push(buildRoomUrl(r))}
                   className="px-4 py-2 rounded-lg bg-accent hover:brightness-110 text-sm font-medium"
                 >
                   Rejoindre

@@ -123,31 +123,32 @@ strict) nécessite un test sur réseau mobile/Wi-Fi d'entreprise avec de vraies 
 
 ---
 
-## Phase 4 — Refactor + filet qualité (~2–3 j)
+## Phase 4 — Refactor + filet qualité (~2–3 j) ✅ FAIT (branche `phase-0-quick-wins`)
 
 **Objectif :** casser le méga-`useEffect` de ~225 lignes et installer les garde-fous automatiques
 avant d'ajouter des fonctionnalités.
 
-- [ ] **Extraire des hooks** depuis `app/room/[id]/page.tsx:103` :
-      `useLocalMedia()` (getUserMedia + toggles), `usePresence()` (announce/poll), `usePeerMesh()`
-      (PeerJS + calls). Stabiliser les dépendances (dépendre de `room?.startedAt` via une ref, pas
-      de l'objet `room`) — corrige le bug latent « changer la metadata reconstruit tout le mesh +
-      ré-acquiert la caméra ».
-- [ ] **Centraliser les constantes** — `lib/constants.ts` partagé client/serveur
-      (heartbeat 5 s, `PEER_TIMEOUT_MS` 30 s, `PEER_DROP_MS` 60 s, tick…). Invariant à documenter :
-      `PEER_DROP_MS > PEER_TIMEOUT_MS > HEARTBEAT_MS`.
-- [ ] **Types & liens partagés** — `lib/types.ts` (types Room/Peer uniques, redéfinis 4× aujourd'hui)
-      + `lib/roomLink.ts` (`buildRoomUrl` / `parseRoomParams`) ; exporter `roomMetaView` pour
-      supprimer le shaping inline dupliqué (`peers/route.ts:46`).
-- [ ] **Tests Vitest** sur les helpers purs : clamps & cleanup de `store.ts`, `Timer.format`,
-      `roomUrl`/`parseRoomParams`, `cookies`.
-- [ ] **CI GitHub Actions** : `npm ci` → `lint` → `tsc --noEmit` → `build` → `vitest run`.
-- [ ] **Smoke E2E Playwright** : 2 onglets, « deux users se voient » (aurait attrapé la régression
-      de découverte de la Phase 2).
-- [ ] **Réactiver `reactStrictMode: true`** (`next.config.mjs`) une fois les cleanups idempotents.
-- [ ] **Monitoring** — brancher Sentry (client + routes API), remplacer les `catch{}` par `logError`.
+- [x] **Hooks extraits** — `app/room/[id]/hooks/` : `useRoomMeta` (résolution méta), `useLocalMedia`
+      (getUserMedia + toggles, `catch(e)` typé `DOMException` avec messages FR par cas), `usePeerMesh`
+      (PeerJS + calls + présence). La page room passe de ~240 à ~140 lignes, surtout du JSX.
+      `roomRef` mis à jour dans un effet (corrige le warning `react-hooks/refs`).
+- [x] **Constantes centralisées** — `lib/constants.ts` (`HEARTBEAT_MS`, `PEER_DROP_MS`,
+      `STALL_HINT_MS`, `ROOMS_POLL_MS`) + invariant documenté vs `PEER_TIMEOUT_MS` (store).
+- [x] **Helpers partagés** — `lib/roomLink.ts` (`buildRoomUrl`/`parseRoomParams`, contrat `?n&d&s`
+      unifié) + `lib/time.ts` (`formatClock`). Câblés dans home + Timer ; shaping `room` dupliqué déjà
+      supprimé en Phase 2.
+- [x] **Tests Vitest** — 27 tests / 5 fichiers : sanitize (clamps, strip ctrl, caps), `formatClock`,
+      roomLink (round-trip + rejets), backend in-memory (découverte, grâce #11, anti-hijack méta,
+      sanitization), cookies (jsdom).
+- [x] **CI GitHub Actions** — `.github/workflows/ci.yml` : `npm ci` → lint → typecheck → test → build.
+- [x] **`reactStrictMode: true`** réactivé (cleanups idempotents/garde `cancelled`).
+- [ ] **Reporté** : smoke E2E Playwright (2 onglets) ; monitoring Sentry + helper `logError` (les
+      `catch{}` best-effort restent silencieux). 4 warnings `react-hooks/set-state-in-effect` laissés
+      en `warn` (lecture cookie/URL au montage, reset — patterns légitimes, règles très strictes de Next 16).
 
-**Validation :** CI verte sur PR ; couverture des helpers ; strict mode activé sans double-init.
+**Validation :** ✅ `tsc`, `eslint` (0 err, 4 warn), `vitest` (27/27), `next build`, pages home/room
+rendues + API OK après refactor. ⚠️ Le strict mode (double-invoke dev) et le mesh restent à confirmer
+en navigateur (2 onglets + caméra).
 
 ---
 
