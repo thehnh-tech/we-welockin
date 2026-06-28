@@ -1,13 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getPseudo } from "@/lib/cookies";
 import VideoTile from "@/components/VideoTile";
 import Timer from "@/components/Timer";
-
-type PeerInfo = { peerId: string; username: string; lastSeen: number };
-type RoomMeta = { name: string; durationSec: number; startedAt: number };
+import { useRoomMeta } from "./hooks/useRoomMeta";
+import { useLocalMedia } from "./hooks/useLocalMedia";
+import { usePeerMesh } from "./hooks/usePeerMesh";
 
 export default function RoomPage() {
   return (
@@ -23,26 +23,10 @@ function RoomInner() {
   const roomId = params.id;
   const router = useRouter();
 
-  const urlName = searchParams?.get("n") ?? null;
-  const urlDuration = searchParams?.get("d") ?? null;
-  const urlStartedAt = searchParams?.get("s") ?? null;
-
   const [pseudo, setPseudoState] = useState<string | null>(null);
-  const [room, setRoom] = useState<RoomMeta | null>(null);
-  const [roomError, setRoomError] = useState<string | null>(null);
-  const [mediaError, setMediaError] = useState<string | null>(null);
-  const [connected, setConnected] = useState(false);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remotes, setRemotes] = useState<
-    Map<string, { username: string; stream: MediaStream }>
-  >(new Map());
-  const [muted, setMuted] = useState(false);
-  const [camOff, setCamOff] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const roomRef = useRef<RoomMeta | null>(null);
-  roomRef.current = room;
-
-  // Read pseudo.
+  // Read pseudo (bounce home if absent).
   useEffect(() => {
     const p = getPseudo();
     if (!p) {
@@ -52,302 +36,47 @@ function RoomInner() {
     setPseudoState(p);
   }, [router]);
 
-  // Resolve room metadata. URL params first, server fallback.
-  useEffect(() => {
-    if (!roomId) return;
+  const { room, roomError } = useRoomMeta(
+    roomId,
+    searchParams?.get("n") ?? null,
+    searchParams?.get("d") ?? null,
+    searchParams?.get("s") ?? null
+  );
 
-    // Try URL params.
-    if (urlName !== null && urlDuration !== null && urlStartedAt !== null) {
-      const d = parseInt(urlDuration, 10);
-      const s = parseInt(urlStartedAt, 10);
-      if (Number.isFinite(d) && Number.isFinite(s) && d >= 60) {
-        setRoom({
-          name: decodeURIComponent(urlName) || "Study session",
-          durationSec: d,
-          startedAt: s,
-        });
-        return;
-      }
-    }
+  const { localStream, mediaError, muted, camOff, toggleMute, toggleCam } =
+    useLocalMedia(!!pseudo && !!room);
 
-    // Fallback: ask the server.
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch(`/api/rooms/${roomId}`, { cache: "no-store" });
-        if (!res.ok) {
-          if (alive)
-            setRoomError(
-              "Lien incomplet et room inconnue. Demande un lien complet à l'organisateur."
-            );
-          return;
-        }
-        const data = await res.json();
-        if (alive && data.room) {
-          setRoom({
-            name: data.room.name,
-            durationSec: data.room.durationSec,
-            startedAt: data.room.startedAt,
-          });
-        }
-      } catch {
-        if (alive) setRoomError("Erreur réseau.");
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [roomId, urlName, urlDuration, urlStartedAt]);
-
-  // Set up media + PeerJS mesh once room metadata is available.
-  useEffect(() => {
-    if (!roomId || !pseudo || !room) return;
-
-    let cancelled = false;
-    let peer: any = null;
-    let myId: string | null = null;
-    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
-    let stream: MediaStream | null = null;
-    const activeCalls = new Map<string, any>();
-    const peerUsernames = new Map<string, string>();
-    const peerLastSeen = new Map<string, number>();
-    const PEER_DROP_MS = 60_000;
-
-    const announce = async () => {
-      if (!myId) return;
-      const r = roomRef.current;
-      try {
-        await fetch(`/api/rooms/${roomId}/peers`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            peerId: myId,
-            username: pseudo,
-            name: r?.name,
-            durationSec: r?.durationSec,
-            startedAt: r?.startedAt,
-          }),
-          keepalive: true,
-        });
-      } catch {}
-    };
-
-    const onPeers = (peers: PeerInfo[]) => {
-      if (cancelled || !myId) return;
-      const now = Date.now();
-
-      for (const p of peers) {
-        peerUsernames.set(p.peerId, p.username);
-        peerLastSeen.set(p.peerId, now);
-      }
-
-      for (const p of peers) {
-        if (p.peerId === myId) continue;
-        if (activeCalls.has(p.peerId)) continue;
-        if (myId < p.peerId) {
-          if (!stream || !peer) continue;
-          const call = peer.call(p.peerId, stream, {
-            metadata: { username: pseudo },
-          });
-          if (call) attachCall(call, p.peerId);
-        }
-      }
-
-      // Drop calls only after sustained absence — a single missed poll from a
-      // serverless cold start should not tear down a healthy WebRTC connection.
-      for (const peerId of Array.from(activeCalls.keys())) {
-        const last = peerLastSeen.get(peerId) ?? 0;
-        if (last > 0 && now - last > PEER_DROP_MS) {
-          const call = activeCalls.get(peerId);
-          try {
-            call?.close();
-          } catch {}
-          activeCalls.delete(peerId);
-          peerLastSeen.delete(peerId);
-          setRemotes((prev) => {
-            const next = new Map(prev);
-            next.delete(peerId);
-            return next;
-          });
-        }
-      }
-
-      setRemotes((prev) => {
-        let changed = false;
-        const next = new Map(prev);
-        for (const [pid, info] of prev) {
-          const u = peerUsernames.get(pid);
-          if (u && u !== info.username) {
-            next.set(pid, { ...info, username: u });
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    };
-
-    const attachCall = (call: any, remotePeerId: string) => {
-      activeCalls.set(remotePeerId, call);
-      peerLastSeen.set(remotePeerId, Date.now());
-
-      const meta = call.metadata as { username?: string } | undefined;
-      if (meta?.username) peerUsernames.set(remotePeerId, meta.username);
-
-      call.on("stream", (remoteStream: MediaStream) => {
-        if (cancelled) return;
-        const username = peerUsernames.get(remotePeerId) ?? "Anon";
-        setRemotes((prev) => {
-          const next = new Map(prev);
-          next.set(remotePeerId, { username, stream: remoteStream });
-          return next;
-        });
-      });
-      call.on("close", () => {
-        activeCalls.delete(remotePeerId);
-        if (cancelled) return;
-        setRemotes((prev) => {
-          const next = new Map(prev);
-          next.delete(remotePeerId);
-          return next;
-        });
-      });
-      call.on("error", () => {
-        activeCalls.delete(remotePeerId);
-      });
-    };
-
-    const poll = async () => {
-      if (!myId) return;
-      try {
-        const res = await fetch(`/api/rooms/${roomId}/peers`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        onPeers(data.peers ?? []);
-      } catch {}
-    };
-
-    const init = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 } },
-          audio: true,
-        });
-      } catch (e: any) {
-        if (!cancelled) {
-          setMediaError(
-            e?.name === "NotAllowedError"
-              ? "Permission refusée. Autorise la caméra et le micro."
-              : "Impossible d'accéder à la caméra/micro."
-          );
-        }
-        return;
-      }
-      if (cancelled) {
-        stream?.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      setLocalStream(stream);
-
-      const PeerModule = await import("peerjs");
-      const Peer = PeerModule.default;
-      if (cancelled) return;
-
-      peer = new Peer({
-        debug: 1,
-        config: {
-          iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:global.stun.twilio.com:3478" },
-          ],
-        },
-      });
-
-      peer.on("open", (id: string) => {
-        if (cancelled) {
-          try {
-            peer.destroy();
-          } catch {}
-          return;
-        }
-        myId = id;
-        setConnected(true);
-        announce();
-        poll();
-        heartbeatTimer = setInterval(announce, 5000);
-        pollTimer = setInterval(poll, 3000);
-      });
-
-      peer.on("call", (call: any) => {
-        if (cancelled || !stream) return;
-        call.answer(stream);
-        attachCall(call, call.peer);
-      });
-
-      peer.on("error", (err: any) => {
-        console.error("PeerJS error", err);
-      });
-
-      peer.on("disconnected", () => {
-        try {
-          peer?.reconnect();
-        } catch {}
-      });
-    };
-
-    init();
-
-    return () => {
-      cancelled = true;
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
-      if (pollTimer) clearInterval(pollTimer);
-      for (const call of activeCalls.values()) {
-        try {
-          call.close();
-        } catch {}
-      }
-      if (peer) {
-        try {
-          peer.destroy();
-        } catch {}
-      }
-      if (stream) {
-        for (const t of stream.getTracks()) t.stop();
-      }
-      if (myId) {
-        try {
-          fetch(`/api/rooms/${roomId}/peers?peerId=${myId}`, {
-            method: "DELETE",
-            keepalive: true,
-          });
-        } catch {}
-      }
-    };
-  }, [roomId, pseudo, room]);
-
-  const toggleMute = () => {
-    if (!localStream) return;
-    const next = !muted;
-    localStream.getAudioTracks().forEach((t) => (t.enabled = !next));
-    setMuted(next);
-  };
-
-  const toggleCam = () => {
-    if (!localStream) return;
-    const next = !camOff;
-    localStream.getVideoTracks().forEach((t) => (t.enabled = !next));
-    setCamOff(next);
-  };
+  const { connected, remotes, banner, dismissWarning } = usePeerMesh({
+    roomId,
+    pseudo,
+    room,
+    localStream,
+  });
 
   const leave = () => {
     router.push("/");
   };
 
   const copyLink = async () => {
+    const url = window.location.href;
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        // Fallback for non-secure contexts (e.g. LAN over HTTP) where the
+        // async Clipboard API is unavailable.
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
     } catch {}
   };
 
@@ -362,7 +91,7 @@ function RoomInner() {
             onClick={() => router.push("/")}
             className="px-4 py-2 rounded-lg bg-accent"
           >
-            Retour à l'accueil
+            Retour à l&apos;accueil
           </button>
         </div>
       </main>
@@ -407,10 +136,12 @@ function RoomInner() {
         <div className="flex items-center gap-2">
           <button
             onClick={copyLink}
-            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
-            title="Copier le lien"
+            className={`px-3 py-1.5 rounded-lg text-sm ${
+              copied ? "bg-emerald-500/80" : "bg-white/10 hover:bg-white/20"
+            }`}
+            title="Copier le lien d'invitation"
           >
-            Inviter
+            {copied ? "Lien copié !" : "Inviter"}
           </button>
           <button
             onClick={leave}
@@ -420,6 +151,22 @@ function RoomInner() {
           </button>
         </div>
       </header>
+
+      {banner && (
+        <div
+          role="status"
+          className="px-4 py-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-sm flex items-center justify-between gap-3"
+        >
+          <span>{banner}</span>
+          <button
+            onClick={dismissWarning}
+            aria-label="Masquer l'avertissement"
+            className="shrink-0 text-amber-200/70 hover:text-amber-100"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 p-4 md:p-6 flex flex-col items-center gap-6">
         {room && (
@@ -447,19 +194,23 @@ function RoomInner() {
       <footer className="px-6 py-4 border-t border-white/5 flex items-center justify-center gap-3">
         <button
           onClick={toggleMute}
+          aria-pressed={muted}
+          aria-label={muted ? "Réactiver le micro" : "Couper le micro"}
           className={`px-4 py-2 rounded-lg text-sm font-medium ${
             muted ? "bg-red-500/80" : "bg-white/10 hover:bg-white/20"
           }`}
         >
-          {muted ? "Micro coupé" : "Micro"}
+          {muted ? "🔇 Micro coupé" : "🎤 Micro"}
         </button>
         <button
           onClick={toggleCam}
+          aria-pressed={camOff}
+          aria-label={camOff ? "Réactiver la caméra" : "Couper la caméra"}
           className={`px-4 py-2 rounded-lg text-sm font-medium ${
             camOff ? "bg-red-500/80" : "bg-white/10 hover:bg-white/20"
           }`}
         >
-          {camOff ? "Caméra coupée" : "Caméra"}
+          {camOff ? "📷 Caméra coupée" : "📹 Caméra"}
         </button>
       </footer>
     </main>
