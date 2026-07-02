@@ -1,15 +1,21 @@
 import { useEffect, useState } from "react";
 import { parseRoomParams } from "@/lib/roomLink";
 
-export type RoomMeta = { name: string; durationSec: number; startedAt: number };
+export type RoomMeta = {
+  name: string;
+  subject: string;
+  durationSec: number;
+  startedAt: number;
+};
 
 // Resolve room metadata: trust the deep-link params first, otherwise ask the
-// server (works for bare links shared during a presence gap).
+// server (works for bare links / room codes shared without params).
 export function useRoomMeta(
   roomId: string | undefined,
   n: string | null,
   d: string | null,
-  s: string | null
+  s: string | null,
+  sub: string | null
 ): { room: RoomMeta | null; roomError: string | null } {
   const [room, setRoom] = useState<RoomMeta | null>(null);
   const [roomError, setRoomError] = useState<string | null>(null);
@@ -17,7 +23,7 @@ export function useRoomMeta(
   useEffect(() => {
     if (!roomId) return;
 
-    const fromUrl = parseRoomParams({ n, d, s });
+    const fromUrl = parseRoomParams({ n, d, s, sub });
     if (fromUrl) {
       setRoom(fromUrl);
       return;
@@ -30,7 +36,7 @@ export function useRoomMeta(
         if (!res.ok) {
           if (alive)
             setRoomError(
-              "Lien incomplet et room inconnue. Demande un lien complet à l'organisateur."
+              "Room introuvable. Vérifie le code, ou demande un nouveau lien à l'organisateur."
             );
           return;
         }
@@ -38,6 +44,7 @@ export function useRoomMeta(
         if (alive && data.room) {
           setRoom({
             name: data.room.name,
+            subject: data.room.subject ?? "",
             durationSec: data.room.durationSec,
             startedAt: data.room.startedAt,
           });
@@ -49,7 +56,7 @@ export function useRoomMeta(
     return () => {
       alive = false;
     };
-  }, [roomId, n, d, s]);
+  }, [roomId, n, d, s, sub]);
 
   return { room, roomError };
 }

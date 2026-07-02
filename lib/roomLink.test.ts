@@ -3,7 +3,7 @@ import { buildRoomUrl, parseRoomParams } from "./roomLink";
 
 function paramsOf(url: string) {
   const qs = new URLSearchParams(url.split("?")[1] ?? "");
-  return { n: qs.get("n"), d: qs.get("d"), s: qs.get("s") };
+  return { n: qs.get("n"), d: qs.get("d"), s: qs.get("s"), sub: qs.get("sub") };
 }
 
 describe("roomLink", () => {
@@ -13,6 +13,7 @@ describe("roomLink", () => {
       name: "Révisions maths",
       durationSec: 1500,
       startedAt: 1782573741066,
+      subject: "Chapitre 4",
     };
     const url = buildRoomUrl(meta);
     expect(url.startsWith("/room/abc123?")).toBe(true);
@@ -22,7 +23,19 @@ describe("roomLink", () => {
       name: "Révisions maths",
       durationSec: 1500,
       startedAt: 1782573741066,
+      subject: "Chapitre 4",
     });
+  });
+
+  it("omits the subject param when empty and parses it back as empty", () => {
+    const url = buildRoomUrl({
+      id: "x",
+      name: "N",
+      durationSec: 1500,
+      startedAt: 1,
+    });
+    expect(url.includes("sub=")).toBe(false);
+    expect(parseRoomParams(paramsOf(url))?.subject).toBe("");
   });
 
   it("returns null when a param is missing", () => {

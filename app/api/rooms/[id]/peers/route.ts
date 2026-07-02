@@ -40,8 +40,10 @@ export async function POST(
     peerId?: string;
     username?: string;
     name?: string;
+    subject?: string;
     durationSec?: number;
     startedAt?: number;
+    status?: { muted?: boolean; away?: boolean; deep?: boolean };
   };
   try {
     body = JSON.parse(rawBody);
@@ -59,8 +61,10 @@ export async function POST(
     peerId,
     username: (body.username ?? "").toString(),
     name: body.name,
+    subject: body.subject,
     durationSec: body.durationSec,
     startedAt: body.startedAt,
+    status: body.status,
   });
   // `room` is already the public meta shape { id, name, durationSec, startedAt }.
   return NextResponse.json({ peers, room });

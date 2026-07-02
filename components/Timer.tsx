@@ -6,6 +6,7 @@ import { formatClock } from "@/lib/time";
 type Props = {
   startedAt: number;
   durationSec: number;
+  big?: boolean; // focus-mode variant
 };
 
 // A short two-note chime synthesized via WebAudio — no asset to ship.
@@ -37,7 +38,7 @@ function playChime() {
   } catch {}
 }
 
-export default function Timer({ startedAt, durationSec }: Props) {
+export default function Timer({ startedAt, durationSec, big = false }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const firedRef = useRef(false);
 
@@ -119,10 +120,19 @@ export default function Timer({ startedAt, durationSec }: Props) {
     };
   }, [finished, remainingSec]);
 
+  // Mockup geometry: 168px ring (300px in focus mode).
+  const ringPx = big ? 300 : 168;
+  const strokeW = big ? 11 : 8;
+  const r = ringPx / 2 - strokeW - 2;
+  const mid = ringPx / 2;
+  const circumference = 2 * Math.PI * r;
+  const color = finished ? "#22c55e" : "#6366f1";
+
   return (
     <div className="flex flex-col items-center justify-center">
       <div
-        className="relative w-56 h-56 md:w-72 md:h-72"
+        className="relative transition-all duration-300"
+        style={{ width: ringPx, height: ringPx }}
         role="timer"
         aria-label={
           finished
@@ -130,45 +140,64 @@ export default function Timer({ startedAt, durationSec }: Props) {
             : `Temps restant : ${formatClock(remainingSec)}`
         }
       >
+        <span
+          aria-hidden="true"
+          className="absolute rounded-full animate-wl-breathe"
+          style={{
+            inset: 14,
+            background: color,
+            filter: `blur(${big ? 44 : 24}px)`,
+          }}
+        />
         <svg
-          className="w-full h-full -rotate-90"
-          viewBox="0 0 100 100"
+          className="relative -rotate-90"
+          width={ringPx}
+          height={ringPx}
+          viewBox={`0 0 ${ringPx} ${ringPx}`}
           aria-hidden="true"
         >
           <circle
-            cx="50"
-            cy="50"
-            r="46"
+            cx={mid}
+            cy={mid}
+            r={r}
             fill="none"
-            stroke="rgba(255,255,255,0.08)"
-            strokeWidth="4"
+            stroke="#26262a"
+            strokeWidth={strokeW}
           />
           <circle
-            cx="50"
-            cy="50"
-            r="46"
+            cx={mid}
+            cy={mid}
+            r={r}
             fill="none"
-            stroke={finished ? "#34d399" : "#7c5cff"}
-            strokeWidth="4"
+            stroke={color}
+            strokeWidth={strokeW}
             strokeLinecap="round"
-            strokeDasharray={`${2 * Math.PI * 46}`}
-            strokeDashoffset={`${2 * Math.PI * 46 * (1 - progress)}`}
+            strokeDasharray={`${circumference}`}
+            strokeDashoffset={`${circumference * (1 - progress)}`}
             style={{ transition: "stroke-dashoffset 0.5s linear" }}
           />
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div
-            className="font-mono text-4xl md:text-5xl font-bold tabular-nums"
-            aria-hidden="true"
-          >
-            {finished ? "00:00" : formatClock(remainingSec)}
-          </div>
-          <div
-            className="mt-2 text-xs uppercase tracking-widest text-white/50"
-            aria-hidden="true"
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center"
+          aria-hidden="true"
+        >
+          <span
+            className="font-bold uppercase"
+            style={{
+              fontSize: big ? 13 : 10,
+              letterSpacing: ".16em",
+              color: finished ? "#4ade80" : "#818cf8",
+              marginBottom: 3,
+            }}
           >
             {finished ? "Terminé" : "Focus"}
-          </div>
+          </span>
+          <span
+            className="font-mono font-bold leading-none tracking-tight text-white tabular-nums"
+            style={{ fontSize: big ? 56 : 26 }}
+          >
+            {finished ? "00:00" : formatClock(remainingSec)}
+          </span>
         </div>
       </div>
       {/* Announced once by screen readers when the session ends. */}

@@ -5,6 +5,8 @@ import {
   sanitizeName,
   sanitizePeerId,
   sanitizeStartedAt,
+  sanitizeStatus,
+  sanitizeSubject,
   sanitizeUsername,
 } from "./sanitize";
 
@@ -66,5 +68,34 @@ describe("sanitizePeerId", () => {
   it("truncates to 64 chars", () => {
     expect(sanitizePeerId("p".repeat(200)).length).toBe(64);
     expect(sanitizePeerId(undefined)).toBe("");
+  });
+});
+
+describe("sanitizeSubject", () => {
+  it("allows empty, strips control chars, truncates", () => {
+    expect(sanitizeSubject(undefined)).toBe("");
+    expect(sanitizeSubject("  ")).toBe("");
+    expect(sanitizeSubject("Algo" + BELL + " P4")).toBe("Algo P4");
+    expect(sanitizeSubject("s".repeat(100)).length).toBe(60);
+  });
+});
+
+describe("sanitizeStatus", () => {
+  it("coerces to strict booleans and defaults to false", () => {
+    expect(sanitizeStatus(undefined)).toEqual({
+      muted: false,
+      away: false,
+      deep: false,
+    });
+    expect(sanitizeStatus({ muted: true, away: "yes", deep: 1 })).toEqual({
+      muted: true,
+      away: false,
+      deep: false,
+    });
+    expect(sanitizeStatus({ deep: true })).toEqual({
+      muted: false,
+      away: false,
+      deep: true,
+    });
   });
 });

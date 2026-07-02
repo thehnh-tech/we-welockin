@@ -1,4 +1,4 @@
-// The single source of truth for the room deep-link contract (?n & d & s).
+// The single source of truth for the room deep-link contract (?n & d & s & sub).
 // Used by the home page to build links and by the room page to read them.
 
 export type RoomLinkMeta = {
@@ -6,14 +6,17 @@ export type RoomLinkMeta = {
   name: string;
   durationSec: number;
   startedAt: number;
+  subject?: string;
 };
 
 export function buildRoomUrl(meta: RoomLinkMeta): string {
-  const qs = new URLSearchParams({
+  const params: Record<string, string> = {
     n: meta.name,
     d: String(meta.durationSec),
     s: String(meta.startedAt),
-  }).toString();
+  };
+  if (meta.subject) params.sub = meta.subject;
+  const qs = new URLSearchParams(params).toString();
   return `/room/${encodeURIComponent(meta.id)}?${qs}`;
 }
 
@@ -21,6 +24,7 @@ export type ParsedRoomParams = {
   name: string;
   durationSec: number;
   startedAt: number;
+  subject: string;
 };
 
 // Parse the optional deep-link params. Returns null when absent or invalid, so
@@ -29,6 +33,7 @@ export function parseRoomParams(params: {
   n: string | null;
   d: string | null;
   s: string | null;
+  sub?: string | null;
 }): ParsedRoomParams | null {
   if (params.n === null || params.d === null || params.s === null) return null;
   const durationSec = parseInt(params.d, 10);
@@ -44,5 +49,6 @@ export function parseRoomParams(params: {
     name: decodeURIComponent(params.n) || "Study session",
     durationSec,
     startedAt,
+    subject: params.sub ? decodeURIComponent(params.sub) : "",
   };
 }
