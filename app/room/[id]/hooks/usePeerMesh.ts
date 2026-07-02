@@ -5,30 +5,46 @@ import { buildPeerOptions, peerErrorMessage } from "@/lib/rtc-config";
 import { HEARTBEAT_MS, PEER_DROP_MS, STALL_HINT_MS } from "@/lib/constants";
 import type { RoomMeta } from "./useRoomMeta";
 
-type PeerInfo = { peerId: string; username: string; lastSeen: number };
+export type PeerStatus = { muted: boolean; away: boolean; deep: boolean };
+
+export type RosterEntry = {
+  peerId: string;
+  username: string;
+  lastSeen: number;
+  joinedAt: number;
+  status: PeerStatus;
+};
+
 export type Remote = { username: string; stream: MediaStream };
 
 const STALL_HINT =
   "Connexion difficile avec les autres participants. Sur certains réseaux (NAT strict, 4G, Wi-Fi d'entreprise), un serveur TURN est nécessaire.";
 
 // The WebRTC mesh: signaling presence via REST, calling every other peer
-// (lower id initiates), and tracking remote streams. The room metadata is read
-// through a ref so changing it does not tear the mesh down.
+// (lower id initiates), and tracking remote streams. The room metadata and the
+// live status are read through refs so changing them does not tear the mesh
+// down; status changes are pushed on the next heartbeat (or via refreshStatus).
 export function usePeerMesh(opts: {
   roomId: string | undefined;
   pseudo: string | null;
   room: RoomMeta | null;
   localStream: MediaStream | null;
+  statusRef: React.RefObject<PeerStatus>;
 }): {
   connected: boolean;
+  myPeerId: string | null;
   remotes: Map<string, Remote>;
+  roster: RosterEntry[];
   banner: string | null;
   dismissWarning: () => void;
+  refreshStatus: () => void;
 } {
-  const { roomId, pseudo, room, localStream } = opts;
+  const { roomId, pseudo, room, localStream, statusRef } = opts;
 
   const [connected, setConnected] = useState(false);
+  const [myPeerId, setMyPeerId] = useState<string | null>(null);
   const [remotes, setRemotes] = useState<Map<string, Remote>>(new Map());
+  const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [othersCount, setOthersCount] = useState(0);
   const [connWarning, setConnWarning] = useState<string | null>(null);
   const [stalled, setStalled] = useState(false);
@@ -37,6 +53,10 @@ export function usePeerMesh(opts: {
   useEffect(() => {
     roomRef.current = room;
   }, [room]);
+
+  // Lets the page push a status change immediately instead of waiting for the
+  // next heartbeat.
+  const announceNowRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!roomId || !pseudo || !room || !localStream) return;
@@ -50,8 +70,9 @@ export function usePeerMesh(opts: {
     const peerUsernames = new Map<string, string>();
     const peerLastSeen = new Map<string, number>();
 
-    // One round-trip does double duty: it refreshes our presence (heartbeat) and
-    // returns the current peer list, so there is no separate poll loop.
+    // One round-trip does double duty: it refreshes our presence (heartbeat,
+    // including live status) and returns the current peer list, so there is no
+    // separate poll loop.
     const announce = async () => {
       if (!myId) return;
       const r = roomRef.current;
@@ -63,17 +84,30 @@ export function usePeerMesh(opts: {
             peerId: myId,
             username: pseudo,
             name: r?.name,
+            subject: r?.subject,
             durationSec: r?.durationSec,
             startedAt: r?.startedAt,
+            status: statusRef.current,
           }),
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          // 4xx is deterministic (413 forged oversized link, 429 rate limit…):
+          // surface it instead of failing presence silently. 5xx stays quiet —
+          // transient server errors resolve on the next heartbeat.
+          if (res.status >= 400 && res.status < 500 && !cancelled) {
+            setConnWarning(
+              `Le serveur a refusé la mise à jour de présence (${res.status}). Recharge la page ou vérifie le lien.`
+            );
+          }
+          return;
+        }
         const data = await res.json();
         onPeers(data.peers ?? []);
       } catch {}
     };
+    announceNowRef.current = announce;
 
-    const onPeers = (peers: PeerInfo[]) => {
+    const onPeers = (peers: RosterEntry[]) => {
       if (cancelled || !myId) return;
       const now = Date.now();
 
@@ -81,6 +115,7 @@ export function usePeerMesh(opts: {
         peerUsernames.set(p.peerId, p.username);
         peerLastSeen.set(p.peerId, now);
       }
+      setRoster(peers);
       setOthersCount(peers.filter((p) => p.peerId !== myId).length);
 
       for (const p of peers) {
@@ -179,6 +214,7 @@ export function usePeerMesh(opts: {
           return;
         }
         myId = id;
+        setMyPeerId(id);
         setConnected(true);
         announce();
         refreshTimer = setInterval(announce, HEARTBEAT_MS);
@@ -216,6 +252,7 @@ export function usePeerMesh(opts: {
 
     return () => {
       cancelled = true;
+      announceNowRef.current = () => {};
       if (refreshTimer) clearInterval(refreshTimer);
       for (const call of activeCalls.values()) {
         try {
@@ -236,7 +273,7 @@ export function usePeerMesh(opts: {
         } catch {}
       }
     };
-  }, [roomId, pseudo, room, localStream]);
+  }, [roomId, pseudo, room, localStream, statusRef]);
 
   // If other participants are present but no media connection has established
   // after a grace period, surface a TURN hint (classic symmetric-NAT symptom).
@@ -253,6 +290,15 @@ export function usePeerMesh(opts: {
     setConnWarning(null);
     setStalled(false);
   };
+  const refreshStatus = () => announceNowRef.current();
 
-  return { connected, remotes, banner, dismissWarning };
+  return {
+    connected,
+    myPeerId,
+    remotes,
+    roster,
+    banner,
+    dismissWarning,
+    refreshStatus,
+  };
 }

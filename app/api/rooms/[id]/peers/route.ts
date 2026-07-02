@@ -12,13 +12,18 @@ function clientIp(req: NextRequest): string {
   return req.headers.get("x-real-ip") ?? "unknown";
 }
 
+// Public view: usernames only. peerId / status / joinedAt are reserved for
+// members (they get the full list from their own announce response) — exposing
+// peerIds here would let anyone impersonate a member's presence entry.
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   const peers = await listPeers(id);
-  return NextResponse.json({ peers });
+  return NextResponse.json({
+    peers: peers.map((p) => ({ username: p.username })),
+  });
 }
 
 export async function POST(
@@ -40,8 +45,10 @@ export async function POST(
     peerId?: string;
     username?: string;
     name?: string;
+    subject?: string;
     durationSec?: number;
     startedAt?: number;
+    status?: { muted?: boolean; away?: boolean; deep?: boolean };
   };
   try {
     body = JSON.parse(rawBody);
@@ -59,8 +66,10 @@ export async function POST(
     peerId,
     username: (body.username ?? "").toString(),
     name: body.name,
+    subject: body.subject,
     durationSec: body.durationSec,
     startedAt: body.startedAt,
+    status: body.status,
   });
   // `room` is already the public meta shape { id, name, durationSec, startedAt }.
   return NextResponse.json({ peers, room });

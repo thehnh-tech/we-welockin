@@ -80,4 +80,65 @@ describe("memoryBackend", () => {
     });
     expect(peers[0].username.length).toBe(30);
   });
+
+  it("stores subject on creation and per-peer status on each announce", async () => {
+    const id = rid();
+    const first = await memoryBackend.announce({
+      roomId: id,
+      peerId: "a",
+      username: "A",
+      subject: "Algorithmes",
+      status: { muted: true, away: false, deep: false },
+    });
+    expect(first.room.subject).toBe("Algorithmes");
+    expect(first.peers[0].status).toEqual({
+      muted: true,
+      away: false,
+      deep: false,
+    });
+
+    const second = await memoryBackend.announce({
+      roomId: id,
+      peerId: "a",
+      username: "A",
+      status: { muted: false, away: true, deep: true },
+    });
+    expect(second.peers[0].status).toEqual({
+      muted: false,
+      away: true,
+      deep: true,
+    });
+  });
+
+  it("preserves joinedAt across re-announces", async () => {
+    const id = rid();
+    const first = await memoryBackend.announce({
+      roomId: id,
+      peerId: "a",
+      username: "A",
+    });
+    const joined = first.peers[0].joinedAt;
+    await new Promise((r) => setTimeout(r, 5));
+    const second = await memoryBackend.announce({
+      roomId: id,
+      peerId: "a",
+      username: "A",
+    });
+    expect(second.peers[0].joinedAt).toBe(joined);
+  });
+
+  it("flags the room deep when any peer is in Deep Focus", async () => {
+    const id = rid();
+    await memoryBackend.announce({ roomId: id, peerId: "a", username: "A" });
+    let room = await memoryBackend.getRoom(id);
+    expect(room?.deep).toBe(false);
+    await memoryBackend.announce({
+      roomId: id,
+      peerId: "b",
+      username: "B",
+      status: { deep: true },
+    });
+    room = await memoryBackend.getRoom(id);
+    expect(room?.deep).toBe(true);
+  });
 });

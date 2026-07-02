@@ -28,6 +28,24 @@ export function sanitizeUsername(username: string | undefined): string {
   );
 }
 
+// Unlike the name, an empty subject is fine.
+export function sanitizeSubject(subject: string | undefined): string {
+  return (subject ?? "").toString().replace(CONTROL_CHARS, "").trim().slice(0, 60);
+}
+
+export function sanitizeStatus(status: unknown): {
+  muted: boolean;
+  away: boolean;
+  deep: boolean;
+} {
+  const s = (status ?? {}) as Record<string, unknown>;
+  return {
+    muted: s.muted === true,
+    away: s.away === true,
+    deep: s.deep === true,
+  };
+}
+
 export function sanitizeDuration(durationSec: number | undefined): number {
   const v = Math.floor(durationSec ?? DEFAULT_DURATION_SEC);
   return Number.isFinite(v)

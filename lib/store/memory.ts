@@ -15,6 +15,8 @@ import {
   sanitizePeerId,
   sanitizeRoomId,
   sanitizeStartedAt,
+  sanitizeStatus,
+  sanitizeSubject,
   sanitizeUsername,
 } from "./sanitize";
 
@@ -59,13 +61,23 @@ function cleanupAll(now: number): void {
   }
 }
 
+function anyDeep(room: MemRoom): boolean {
+  for (const p of room.peers.values()) {
+    if (p.status.deep) return true;
+  }
+  return false;
+}
+
 function toPublic(room: MemRoom): RoomPublic {
   return {
     id: room.id,
     name: room.name,
+    subject: room.subject,
     durationSec: room.durationSec,
     startedAt: room.startedAt,
     peerCount: room.peers.size,
+    deep: anyDeep(room),
+    peerNames: Array.from(room.peers.values(), (p) => p.username).slice(0, 4),
   };
 }
 
@@ -73,6 +85,7 @@ function toMeta(room: MemRoom): RoomMeta {
   return {
     id: room.id,
     name: room.name,
+    subject: room.subject,
     durationSec: room.durationSec,
     startedAt: room.startedAt,
   };
@@ -107,6 +120,7 @@ export const memoryBackend: StoreBackend = {
       room = {
         id: roomId,
         name: sanitizeName(input.name),
+        subject: sanitizeSubject(input.subject),
         durationSec,
         startedAt,
         peers: new Map(),
@@ -118,11 +132,14 @@ export const memoryBackend: StoreBackend = {
     const peerId = sanitizePeerId(input.peerId);
     cleanupRoom(room, now);
     // Soft per-room cap: silently skip registering a brand-new peer once full.
-    if (room.peers.has(peerId) || room.peers.size < MAX_PEERS_PER_ROOM) {
+    const existing = room.peers.get(peerId);
+    if (existing || room.peers.size < MAX_PEERS_PER_ROOM) {
       room.peers.set(peerId, {
         peerId,
         username: sanitizeUsername(input.username),
         lastSeen: now,
+        joinedAt: existing?.joinedAt ?? now,
+        status: sanitizeStatus(input.status),
       });
       room.emptySince = null;
     }

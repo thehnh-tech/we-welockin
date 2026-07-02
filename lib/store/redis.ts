@@ -18,14 +18,16 @@ import {
   sanitizePeerId,
   sanitizeRoomId,
   sanitizeStartedAt,
+  sanitizeStatus,
+  sanitizeSubject,
   sanitizeUsername,
 } from "./sanitize";
 
 // Redis schema (prefix wlis:):
-//   wlis:room:{id}        -> hash { name, durationSec, startedAt }   (TTL)
-//   wlis:room:{id}:peers  -> sorted set  peerId -> lastSeen (ms)     (TTL)
-//   wlis:room:{id}:names  -> hash        peerId -> username          (TTL)
-//   wlis:rooms            -> sorted set  roomId -> startedAt   (discovery index)
+//   wlis:room:{id}        -> hash { name, subject, durationSec, startedAt } (TTL)
+//   wlis:room:{id}:peers  -> sorted set  peerId -> lastSeen (ms)            (TTL)
+//   wlis:room:{id}:names  -> hash peerId -> JSON { username, joinedAt, status } (TTL)
+//   wlis:rooms            -> sorted set  roomId -> startedAt    (discovery index)
 const P = "wlis:";
 const metaKey = (id: string) => `${P}room:${id}`;
 const peersKey = (id: string) => `${P}room:${id}:peers`;
@@ -44,8 +46,15 @@ function redis(): Redis {
 
 type RawMeta = {
   name?: unknown;
+  subject?: unknown;
   durationSec?: unknown;
   startedAt?: unknown;
+};
+
+type PeerEntry = {
+  username: string;
+  joinedAt: number;
+  status: { muted: boolean; away: boolean; deep: boolean };
 };
 
 function parseMeta(id: string, raw: RawMeta | null, now: number): RoomMeta | null {
@@ -55,9 +64,40 @@ function parseMeta(id: string, raw: RawMeta | null, now: number): RoomMeta | nul
   return {
     id,
     name: String(raw.name),
+    subject: raw.subject != null ? String(raw.subject) : "",
     durationSec,
     startedAt: Number.isFinite(startedAt) ? startedAt : now,
   };
+}
+
+// Tolerates both the JSON entries written now and the plain-string usernames
+// written by the previous schema version.
+function parsePeerEntry(raw: unknown, fallbackJoinedAt: number): PeerEntry {
+  const def = {
+    username: "Anon",
+    joinedAt: fallbackJoinedAt,
+    status: { muted: false, away: false, deep: false },
+  };
+  if (raw == null) return def;
+  if (typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    return {
+      username: o.username != null ? String(o.username) : "Anon",
+      joinedAt: Number.isFinite(Number(o.joinedAt))
+        ? Number(o.joinedAt)
+        : fallbackJoinedAt,
+      status: sanitizeStatus(o.status),
+    };
+  }
+  const s = String(raw);
+  if (s.startsWith("{")) {
+    try {
+      return parsePeerEntry(JSON.parse(s), fallbackJoinedAt);
+    } catch {
+      return def;
+    }
+  }
+  return { ...def, username: s || "Anon" };
 }
 
 // Drop stale peers from the sorted set + names hash, then return the live ones.
@@ -83,11 +123,29 @@ async function readPeers(id: string, now: number): Promise<Peer[]> {
   if (live.length === 0) return [];
 
   const names = (await r.hgetall<Record<string, unknown>>(namesKey(id))) ?? {};
-  return live.map((p) => ({
-    peerId: p.peerId,
-    username: names[p.peerId] != null ? String(names[p.peerId]) : "Anon",
-    lastSeen: p.lastSeen,
-  }));
+  return live.map((p) => {
+    const entry = parsePeerEntry(names[p.peerId], p.lastSeen);
+    return {
+      peerId: p.peerId,
+      username: entry.username,
+      lastSeen: p.lastSeen,
+      joinedAt: entry.joinedAt,
+      status: entry.status,
+    };
+  });
+}
+
+function anyDeep(peers: Peer[]): boolean {
+  return peers.some((p) => p.status.deep);
+}
+
+function publicView(meta: RoomMeta, peers: Peer[]): RoomPublic {
+  return {
+    ...meta,
+    peerCount: peers.length,
+    deep: anyDeep(peers),
+    peerNames: peers.slice(0, 4).map((p) => p.username),
+  };
 }
 
 export const redisBackend: StoreBackend = {
@@ -101,7 +159,7 @@ export const redisBackend: StoreBackend = {
     );
     if (!meta) return null;
     const peers = await readPeers(roomId, now);
-    return { ...meta, peerCount: peers.length };
+    return publicView(meta, peers);
   },
 
   async listActiveRooms() {
@@ -119,7 +177,9 @@ export const redisBackend: StoreBackend = {
         continue;
       }
       const peers = await readPeers(id, now);
-      if (peers.length > 0) out.push({ ...meta, peerCount: peers.length });
+      if (peers.length > 0) {
+        out.push(publicView(meta, peers));
+      }
     }
     return out;
   },
@@ -134,8 +194,9 @@ export const redisBackend: StoreBackend = {
       const durationSec = sanitizeDuration(input.durationSec);
       const startedAt = sanitizeStartedAt(input.startedAt, durationSec, now);
       const name = sanitizeName(input.name);
-      meta = { id: roomId, name, durationSec, startedAt };
-      await r.hset(metaKey(roomId), { name, durationSec, startedAt });
+      const subject = sanitizeSubject(input.subject);
+      meta = { id: roomId, name, subject, durationSec, startedAt };
+      await r.hset(metaKey(roomId), { name, subject, durationSec, startedAt });
       const roomCount = await r.zcard(INDEX);
       if (roomCount < MAX_ROOMS) {
         await r.zadd(INDEX, { score: startedAt, member: roomId });
@@ -143,14 +204,19 @@ export const redisBackend: StoreBackend = {
     }
 
     const peerId = sanitizePeerId(input.peerId);
-    const alreadyMember = (await r.zscore(peersKey(roomId), peerId)) !== null;
+    const existingRaw = await r.hget(namesKey(roomId), peerId);
+    const alreadyMember = existingRaw !== null;
     const peerCount = await r.zcard(peersKey(roomId));
     // Soft per-room cap: silently skip a brand-new peer once full.
     if (alreadyMember || peerCount < MAX_PEERS_PER_ROOM) {
+      const prev = parsePeerEntry(existingRaw, now);
+      const entry: PeerEntry = {
+        username: sanitizeUsername(input.username),
+        joinedAt: alreadyMember ? prev.joinedAt : now,
+        status: sanitizeStatus(input.status),
+      };
       await r.zadd(peersKey(roomId), { score: now, member: peerId });
-      await r.hset(namesKey(roomId), {
-        [peerId]: sanitizeUsername(input.username),
-      });
+      await r.hset(namesKey(roomId), { [peerId]: JSON.stringify(entry) });
     }
 
     // Refresh TTLs so an active room lives on and an abandoned one expires.
