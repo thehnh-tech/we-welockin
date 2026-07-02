@@ -205,7 +205,7 @@ export default function HomePage() {
             <span className="font-mono text-[13px] font-semibold text-zinc-200">
               {stats.streak}
             </span>
-            <span className="text-xs font-medium text-zinc-500">
+            <span className="text-xs font-medium text-zinc-400">
               {stats.streak > 1 ? "jours de suite" : "jour de suite"}
             </span>
           </div>
@@ -361,24 +361,24 @@ export default function HomePage() {
             <div className="font-mono text-2xl font-bold tracking-tight text-white">
               {formatHours(stats.today)}
             </div>
-            <div className="mt-1 text-xs font-semibold text-zinc-500">
+            <div className="mt-1 text-xs font-semibold text-zinc-400">
               Focus aujourd&apos;hui (h)
             </div>
           </div>
           <div className="rounded-2xl border border-line bg-panel px-5 py-[18px]">
-            <div className="font-mono text-2xl font-bold tracking-tight text-accent">
+            <div className="font-mono text-2xl font-bold tracking-tight text-indigo-400">
               {stats.streak}
             </div>
-            <div className="mt-1 text-xs font-semibold text-zinc-500">
+            <div className="mt-1 text-xs font-semibold text-zinc-400">
               Jours de suite
             </div>
           </div>
           <div className="rounded-2xl border border-line bg-panel px-5 py-[18px]">
             <div className="font-mono text-2xl font-bold tracking-tight text-white">
-              {formatHours(stats.week)}h
+              {formatHours(stats.week)}
             </div>
-            <div className="mt-1 text-xs font-semibold text-zinc-500">
-              Cette semaine
+            <div className="mt-1 text-xs font-semibold text-zinc-400">
+              Cette semaine (h)
             </div>
           </div>
         </div>
@@ -421,7 +421,7 @@ export default function HomePage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2.5">
-                      <span className="font-mono text-xs font-semibold text-accent">
+                      <span className="font-mono text-xs font-semibold text-indigo-400">
                         {remaining > 0
                           ? `Focus ${formatClock(remaining)}`
                           : "Terminé"}
@@ -429,7 +429,7 @@ export default function HomePage() {
                       {r.subject && (
                         <>
                           <span className="text-xs text-zinc-600">·</span>
-                          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-zinc-500">
+                          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-zinc-400">
                             {r.subject}
                           </span>
                         </>

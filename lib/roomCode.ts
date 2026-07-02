@@ -5,12 +5,20 @@
 const PREFIX = "focus-";
 // Unambiguous alphabet: no i/l/o/0/1.
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
-const SUFFIX_LEN = 4;
+const SUFFIX_LEN = 5; // 31^5 ≈ 28.6M — collisions negligible at our room caps
 
 export function generateRoomId(): string {
+  const idx = new Uint32Array(SUFFIX_LEN);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(idx);
+  } else {
+    for (let i = 0; i < SUFFIX_LEN; i++) {
+      idx[i] = Math.floor(Math.random() * ALPHABET.length);
+    }
+  }
   let s = "";
   for (let i = 0; i < SUFFIX_LEN; i++) {
-    s += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+    s += ALPHABET[idx[i] % ALPHABET.length];
   }
   return PREFIX + s;
 }

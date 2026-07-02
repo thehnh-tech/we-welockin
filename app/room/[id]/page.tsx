@@ -123,10 +123,16 @@ function RoomInner() {
       }
     } catch {}
   };
-  // Leaving fullscreen via Esc exits focus mode too.
+  // Leaving fullscreen via Esc exits focus mode too — and restores the
+  // sidebar, exactly like the button path does.
   useEffect(() => {
     const onFsChange = () => {
-      if (!document.fullscreenElement) setFocusMode(false);
+      if (!document.fullscreenElement) {
+        setFocusMode((was) => {
+          if (was) setCollapsed(false);
+          return false;
+        });
+      }
     };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
@@ -319,7 +325,7 @@ function RoomInner() {
               big={focusMode}
             />
           )}
-          <div className="mt-3 text-[13px] font-medium text-zinc-500">
+          <div className="mt-3 text-[13px] font-medium text-zinc-400">
             {deep
               ? "Deep Focus · tout est silencieux, ton micro est coupé"
               : "Lock in · reste concentré jusqu'à la fin du timer"}
@@ -424,6 +430,10 @@ function RoomInner() {
               ? `Connecté, ${roster.length} participant${roster.length > 1 ? "s" : ""}`
               : "Connexion en cours"}
           </div>
+          {/* Screen-reader feedback for the icon-only copy button. */}
+          <span className="sr-only" role="status" aria-live="polite">
+            {copied ? "Lien d'invitation copié" : ""}
+          </span>
         </section>
 
         <div

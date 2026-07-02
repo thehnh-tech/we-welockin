@@ -90,7 +90,17 @@ export function usePeerMesh(opts: {
             status: statusRef.current,
           }),
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          // 4xx is deterministic (413 forged oversized link, 429 rate limit…):
+          // surface it instead of failing presence silently. 5xx stays quiet —
+          // transient server errors resolve on the next heartbeat.
+          if (res.status >= 400 && res.status < 500 && !cancelled) {
+            setConnWarning(
+              `Le serveur a refusé la mise à jour de présence (${res.status}). Recharge la page ou vérifie le lien.`
+            );
+          }
+          return;
+        }
         const data = await res.json();
         onPeers(data.peers ?? []);
       } catch {}

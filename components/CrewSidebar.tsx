@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { avatarColor, initials } from "@/lib/avatar";
 import { formatDuration } from "@/lib/time";
 import type { RosterEntry } from "@/app/room/[id]/hooks/usePeerMesh";
@@ -29,6 +30,16 @@ export default function CrewSidebar({
   onCloseMobile,
   onLeave,
 }: Props) {
+  // Escape closes the mobile drawer (its backdrop is mouse-only).
+  useEffect(() => {
+    if (!mobOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseMobile();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mobOpen, onCloseMobile]);
+
   // Self first, then by arrival.
   const sorted = [...roster].sort((a, b) => {
     if (a.peerId === myPeerId) return -1;
@@ -63,7 +74,7 @@ export default function CrewSidebar({
             <button
               className="wl-collapsebtn h-[30px] w-[30px] items-center justify-center rounded-lg border border-line2 bg-transparent text-zinc-400 hover:bg-line hover:text-white"
               onClick={onCollapse}
-              aria-label="Replier le panneau"
+              aria-label={mobOpen ? "Fermer le panneau" : "Replier le panneau"}
             >
               <svg
                 width="16"
@@ -80,21 +91,21 @@ export default function CrewSidebar({
               </svg>
             </button>
           </div>
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[.12em] text-zinc-600">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[.12em] text-zinc-500">
             Session
           </div>
           <div className="overflow-hidden text-ellipsis whitespace-nowrap text-base font-bold text-white">
             {sessionName}
           </div>
           {subject && (
-            <div className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-zinc-500">
+            <div className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-zinc-400">
               {subject}
             </div>
           )}
         </div>
 
         <div className="flex items-center justify-between px-[18px] pb-2.5 pt-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-[.1em] text-zinc-600">
+          <span className="text-[11px] font-semibold uppercase tracking-[.1em] text-zinc-500">
             Crew · {roster.length}
           </span>
           <span className="text-[11px] font-semibold text-indigo-400">
@@ -134,7 +145,7 @@ export default function CrewSidebar({
                         style={{ background: away ? "#a1a1aa" : "#6366f1" }}
                         aria-hidden="true"
                       />
-                      <span className="text-[11px] font-medium text-zinc-500">
+                      <span className="text-[11px] font-medium text-zinc-400">
                         {away
                           ? "Absent"
                           : p.status.deep
@@ -145,7 +156,7 @@ export default function CrewSidebar({
                   </div>
                   <span
                     className={`font-mono text-[11px] font-semibold ${
-                      isSelf ? "text-indigo-400" : "text-zinc-500"
+                      isSelf ? "text-indigo-400" : "text-zinc-400"
                     }`}
                   >
                     {formatDuration((now - p.joinedAt) / 1000)}

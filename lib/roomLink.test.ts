@@ -52,4 +52,34 @@ describe("roomLink", () => {
     const parsed = parseRoomParams({ n: "", d: "1500", s: "1" });
     expect(parsed?.name).toBe("Study session");
   });
+
+  it("round-trips names containing % without throwing (no double-decode)", () => {
+    const url = buildRoomUrl({
+      id: "x",
+      name: "Maths 50%",
+      durationSec: 1500,
+      startedAt: 1,
+      subject: "100%25 raw",
+    });
+    const parsed = parseRoomParams(paramsOf(url));
+    expect(parsed?.name).toBe("Maths 50%");
+    expect(parsed?.subject).toBe("100%25 raw");
+  });
+
+  it("does not throw on raw percent sequences passed directly", () => {
+    expect(() =>
+      parseRoomParams({ n: "Promo %E0%A4%A", d: "1500", s: "1" })
+    ).not.toThrow();
+  });
+
+  it("clamps oversized name/subject to the server limits", () => {
+    const parsed = parseRoomParams({
+      n: "x".repeat(5000),
+      d: "1500",
+      s: "1",
+      sub: "y".repeat(5000),
+    });
+    expect(parsed?.name.length).toBe(60);
+    expect(parsed?.subject.length).toBe(60);
+  });
 });

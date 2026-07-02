@@ -76,6 +76,8 @@ select {
   min-width: 0;
   border-right-color: transparent;
   overflow: hidden;
+  /* Out of the tab order and the a11y tree while hidden. */
+  visibility: hidden;
 }
 .wl-openbtn {
   display: none;
@@ -98,12 +100,17 @@ select {
     min-width: 248px;
     height: 100vh;
     transform: translateX(-100%);
-    transition: transform 0.28s ease;
+    transition:
+      transform 0.28s ease,
+      visibility 0.28s;
     z-index: 50;
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+    /* Closed drawer: hidden from keyboard + screen readers. */
+    visibility: hidden;
   }
   .wl-sidebar.wl-mobopen {
     transform: translateX(0);
+    visibility: visible;
   }
   .wl-sidebar.wl-collapsed {
     width: 248px;
@@ -112,9 +119,8 @@ select {
   .wl-openbtn {
     display: flex;
   }
-  .wl-collapsebtn {
-    display: none;
-  }
+  /* The collapse button stays visible on mobile: it is the drawer's
+     keyboard-reachable close button. */
   .wl-backdrop.wl-mobopen {
     display: block;
   }

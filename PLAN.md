@@ -152,24 +152,37 @@ en navigateur (2 onglets + caméra).
 
 ---
 
-## Phase 5 — Produit (~3–5 j, itératif)
+## Phase 5 — Produit + redesign complet ✅ FAIT (branche `phase-5-ui`)
 
-**Objectif :** passer de « démo qui marche » à « app qu'on rouvre ».
+**Objectif :** passer de « démo qui marche » à « app qu'on rouvre » — implémenté selon la maquette
+« WeLockIn study room UI » (dark #161618 / indigo #6366f1, Manrope + JetBrains Mono via next/font).
 
-Par ordre d'impact :
+- [x] **Redesign Home** — header (logo, badge streak, avatar), greeting daté, hero création
+      (nom + sujet + timer), carte « Tu as un code ? », rangée de stats, liste live rooms
+      (avatars empilés, badge Deep Focus, timer restant qui tick).
+- [x] **Redesign Room** — sidebar crew rétractable/drawer mobile (statut + temps de focus par
+      personne), chip code room copiable, ring 168/300px, contrôles Micro/Caméra/Deep Focus/Mode focus.
+- [x] **Codes de room** — ids `focus-xxxxx` (crypto), join par code, anciens ids compatibles.
+- [x] **Statuts live par pair** — `{muted, away, deep}` broadcast à chaque heartbeat + `joinedAt`
+      serveur ; détection away via `visibilitychange`.
+- [x] **Deep Focus** — micro forcé coupé (bouton disabled), audio distant silencé localement,
+      badge tuile + badge room sur l'accueil.
+- [x] **Mode focus** — fullscreen, grande ring, grille compacte 6 col, Esc restaure tout.
+- [x] **Détection de parole** — WebAudio RMS local → barres EQ + bordure accent.
+- [x] **Stats locales** — focus/jour en localStorage → aujourd'hui / semaine / streak (testé).
+- [x] **Roster + indicateurs mic** — via payload announce (pas de DataConnection nécessaire).
+- [x] **Revue multi-agents adversariale** (9 agents) → correctifs appliqués : crash `URIError`
+      sur `%` dans les noms (double-décodage), GET /peers assaini (plus de peerId/status/joinedAt
+      publics), clamp des params URL + bannière sur announce 4xx, sidebar cachée hors tab-order,
+      drawer fermable au clavier (Esc + bouton), contrastes AA, codes 5 chars crypto.
 
-- [ ] **Cycles Pomodoro / pauses** — modèle de phases (work/break/cycles) dans les métadonnées room,
-      dérivé de `elapsed`. C'est *le* cœur de la catégorie study-with-me.
-- [ ] **Chat texte** — via `DataConnection` PeerJS (coût quasi nul), canal de secours en room muette.
-- [ ] **Roster participants + indicateurs mic/cam** — diffuser l'état mute/cam (DataConnection ou
-      payload announce) ; badge micro coupé ; détection de niveau audio (speaker actif).
-- [ ] **Objectif/tâche par participant** — petit champ « sur quoi tu bosses » affiché sur la tuile.
-- [ ] **Persistance des sessions (rétention)** — tier Postgres (Neon/Supabase) `sessions(user, room,
-      joined_at, left_at, focus_sec)` écrit au join/leave → historique, stats, streaks. **C'est la
-      feature qui fait revenir l'utilisateur.**
-- [ ] **Confort** : sélecteur de caméra/micro (`enumerateDevices`), screen share, background blur,
-      grille `auto-fit minmax`, état solo « En attente de participants », `prefers-reduced-motion`,
-      contrastes WCAG AA, **i18n** (sortir le français codé en dur, `layout.tsx:15`).
+**Validation :** ✅ tsc, eslint (0 err), vitest 57/57, build ✅ Vérifié en navigateur (preview) :
+gate → home → création → room, Deep Focus on/off avec statut serveur confirmé, room « Maths 50% »
+sans crash, GET public réduit à `{username}`.
+
+**Reporté (Phase 5b)** : cycles Pomodoro/pauses, chat texte (DataConnection), objectif par
+participant, persistance Postgres (historique/streaks cross-device), sélecteur de devices,
+screen share, i18n, token de session anti-spoofing entre membres.
 
 ---
 

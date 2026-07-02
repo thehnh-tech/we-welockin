@@ -23,7 +23,12 @@ export function useRoomMeta(
   useEffect(() => {
     if (!roomId) return;
 
-    const fromUrl = parseRoomParams({ n, d, s, sub });
+    // Defense in depth: a malformed deep link must degrade to the server
+    // lookup, never crash the room.
+    let fromUrl = null;
+    try {
+      fromUrl = parseRoomParams({ n, d, s, sub });
+    } catch {}
     if (fromUrl) {
       setRoom(fromUrl);
       return;

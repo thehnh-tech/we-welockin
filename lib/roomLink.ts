@@ -29,6 +29,12 @@ export type ParsedRoomParams = {
 
 // Parse the optional deep-link params. Returns null when absent or invalid, so
 // the caller falls back to asking the server.
+//
+// NOTE: values arrive ALREADY percent-decoded (useSearchParams().get() /
+// URLSearchParams.get() decode) — do not decode again, a second
+// decodeURIComponent throws URIError on legitimate "%" in names. Lengths are
+// clamped to the server-side limits so a forged oversized URL cannot push the
+// announce payload past the request-body cap.
 export function parseRoomParams(params: {
   n: string | null;
   d: string | null;
@@ -46,9 +52,9 @@ export function parseRoomParams(params: {
     return null;
   }
   return {
-    name: decodeURIComponent(params.n) || "Study session",
+    name: (params.n || "Study session").slice(0, 60),
     durationSec,
     startedAt,
-    subject: params.sub ? decodeURIComponent(params.sub) : "",
+    subject: (params.sub ?? "").slice(0, 60),
   };
 }

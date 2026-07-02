@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { displayRoomCode, generateRoomId, normalizeRoomCode } from "./roomCode";
 
 describe("generateRoomId", () => {
-  it("produces focus-XXXX ids from the unambiguous alphabet", () => {
+  it("produces focus-XXXXX ids from the unambiguous alphabet", () => {
     for (let i = 0; i < 50; i++) {
       const id = generateRoomId();
-      expect(id).toMatch(/^focus-[abcdefghjkmnpqrstuvwxyz23456789]{4}$/);
+      expect(id).toMatch(/^focus-[abcdefghjkmnpqrstuvwxyz23456789]{5}$/);
     }
   });
 });
@@ -15,7 +15,7 @@ describe("normalizeRoomCode", () => {
     expect(normalizeRoomCode("FOCUS-7Q2X")).toBe("focus-7q2x");
   });
   it("accepts the bare suffix", () => {
-    expect(normalizeRoomCode("7Q2X")).toBe("focus-7q2x");
+    expect(normalizeRoomCode("7Q2XZ")).toBe("focus-7q2xz");
   });
   it("accepts sloppy spacing/underscores", () => {
     expect(normalizeRoomCode(" focus_7q2x ")).toBe("focus-7q2x");
