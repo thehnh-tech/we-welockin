@@ -186,7 +186,33 @@ screen share, i18n, token de session anti-spoofing entre membres.
 
 ---
 
-## Phase 6 — Scale au-delà du mesh (à la demande)
+## Phase 6 — Charte graphique welock ✅ FAIT (branche `phase-6-charte`)
+
+**Objectif :** appliquer la « Charte graphique welock v1.0 » (cozy productivity — papier chaud,
+encre brune, terracotta parcimonieux) sur toute l'app, avec animations charte et réglages.
+
+- [x] **Tokens** — surfaces papier (canvas/surface/card/sunken/track), gamme d'encres, accent
+      terracotta (« un seul moment vivant par écran »), danger brique, 7 teintes de catégories,
+      filets alpha encre, ombres chaudes XS→Modale, rayons 8/11/14/16/20/999, courbe (.2,.8,.3,1).
+- [x] **Typo** — Figtree unique (400–700), chronos compris (tabular-nums), interlettrage serré sur
+      titres, casse de phrase, eyebrows 11px ; Manrope + JetBrains Mono retirées.
+- [x] **Marque** — symbole cadenas animé (anse ouverte au repos, se referme à la connexion — seule
+      animation du symbole) + logotype « welock.in » ; voix charte (« Hey {pseudo}, lock in »,
+      nombres arrondis « 1h 42m ») ; zéro emoji/glyphe Unicode (SVG filaires façon Lucide).
+- [x] **Composants & mouvement** — boutons pilules, « remplissage encre = sélectionné » (contrôles
+      engagés, ligne self du roster, flèche join), survol levée + ombre LG, appui scale(.98),
+      apparitions fondu + montée 7px (échelonnées), toast glissé-fondu, avatars jetons teintés.
+- [x] **Réglages (engrenage)** — pseudo éditable, teinte perso (7 teintes charte, broadcast via
+      `status.tint` whiteliste serveur), son de fin, notifications, animations réduites —
+      persistés en localStorage (`lib/prefs.ts`), classe `wl-reduce` en plus de la préférence OS.
+
+**Validation :** ✅ tsc, eslint (0 err), vitest 59/59, build ✅ Navigateur : couleurs charte calculées
+sur les 2 pages, Figtree actif, réglages persistés + teinte visible dans le roster, cadenas refermé
+à la connexion, 0 erreur console. Revue multi-agents → correctifs (voir commit).
+
+---
+
+## Phase 7 — Scale au-delà du mesh (à la demande)
 
 **Déclencheur :** besoin récurrent de > 5–6 participants par room.
 
@@ -200,7 +226,7 @@ screen share, i18n, token de session anti-spoofing entre membres.
 ## Dépendances clés
 - Phase 2 **avant** Phase 5 (persistance/roster s'appuient sur un état partagé fiable).
 - Phase 4 **avant** Phase 5 (refactor hooks = base saine pour les nouvelles features).
-- Phase 6 indépendante, seulement si le besoin de scale apparaît.
+- Phase 7 (SFU) indépendante, seulement si le besoin de scale apparaît.
 
 ## Sprint 1 suggéré (≈ 1 semaine)
 Phase 0 + Phase 1 + Phase 2 → l'app devient **réellement fonctionnelle en prod**, plus rapide,

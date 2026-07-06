@@ -86,16 +86,25 @@ describe("sanitizeStatus", () => {
       muted: false,
       away: false,
       deep: false,
+      tint: "",
     });
     expect(sanitizeStatus({ muted: true, away: "yes", deep: 1 })).toEqual({
       muted: true,
       away: false,
       deep: false,
+      tint: "",
     });
     expect(sanitizeStatus({ deep: true })).toEqual({
       muted: false,
       away: false,
       deep: true,
+      tint: "",
     });
+  });
+
+  it("whitelists the tint key", () => {
+    expect(sanitizeStatus({ tint: "vert" }).tint).toBe("vert");
+    expect(sanitizeStatus({ tint: "neon" }).tint).toBe("");
+    expect(sanitizeStatus({ tint: 42 }).tint).toBe("");
   });
 });

@@ -54,7 +54,7 @@ type RawMeta = {
 type PeerEntry = {
   username: string;
   joinedAt: number;
-  status: { muted: boolean; away: boolean; deep: boolean };
+  status: { muted: boolean; away: boolean; deep: boolean; tint: string };
 };
 
 function parseMeta(id: string, raw: RawMeta | null, now: number): RoomMeta | null {
@@ -76,7 +76,7 @@ function parsePeerEntry(raw: unknown, fallbackJoinedAt: number): PeerEntry {
   const def = {
     username: "Anon",
     joinedAt: fallbackJoinedAt,
-    status: { muted: false, away: false, deep: false },
+    status: { muted: false, away: false, deep: false, tint: "" },
   };
   if (raw == null) return def;
   if (typeof raw === "object") {

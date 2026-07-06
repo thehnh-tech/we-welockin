@@ -2,13 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getPseudo, setPseudo, clearPseudo } from "@/lib/cookies";
+import { getPseudo, setPseudo } from "@/lib/cookies";
 import { buildRoomUrl } from "@/lib/roomLink";
 import { generateRoomId, normalizeRoomCode } from "@/lib/roomCode";
-import { avatarColor, initials } from "@/lib/avatar";
-import { formatClock, formatHours } from "@/lib/time";
+import { formatClock, formatShortDuration } from "@/lib/time";
 import { getStreakDays, getTodaySeconds, getWeekSeconds } from "@/lib/stats";
 import { ROOMS_POLL_MS } from "@/lib/constants";
+import { usePrefs } from "@/lib/prefs";
+import Avatar from "@/components/Avatar";
+import Padlock from "@/components/Padlock";
+import SettingsMenu from "@/components/SettingsMenu";
 
 type RoomView = {
   id: string;
@@ -22,13 +25,13 @@ type RoomView = {
 };
 
 const DAYS_FR = [
-  "DIMANCHE",
-  "LUNDI",
-  "MARDI",
-  "MERCREDI",
-  "JEUDI",
-  "VENDREDI",
-  "SAMEDI",
+  "Dimanche",
+  "Lundi",
+  "Mardi",
+  "Mercredi",
+  "Jeudi",
+  "Vendredi",
+  "Samedi",
 ];
 
 function isoWeek(d: Date): number {
@@ -41,6 +44,7 @@ function isoWeek(d: Date): number {
 
 export default function HomePage() {
   const router = useRouter();
+  const prefs = usePrefs();
   const [pseudo, setPseudoState] = useState<string | null>(null);
   const [pseudoInput, setPseudoInput] = useState("");
   const [rooms, setRooms] = useState<RoomView[]>([]);
@@ -56,7 +60,7 @@ export default function HomePage() {
   useEffect(() => {
     setPseudoState(getPseudo());
     const d = new Date();
-    setGreeting(`${DAYS_FR[d.getDay()]} · SEMAINE ${isoWeek(d)}`);
+    setGreeting(`${DAYS_FR[d.getDay()]} · semaine ${isoWeek(d)}`);
     setStats({
       today: getTodaySeconds(),
       week: getWeekSeconds(),
@@ -138,22 +142,23 @@ export default function HomePage() {
       <main className="flex min-h-screen items-center justify-center p-6">
         <form
           onSubmit={submitPseudo}
-          className="w-full max-w-sm space-y-5 rounded-2xl border border-line bg-panel p-7 shadow-xl"
+          className="w-full max-w-sm space-y-5 rounded-[20px] border border-hairline bg-surface p-7 shadow-modal animate-wl-rise"
         >
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-accent text-[15px] font-extrabold">
-              W
-            </div>
-            <span className="text-[15px] font-extrabold tracking-wide">
-              WeLockIn
+          <div className="flex items-center gap-2 text-ink">
+            <Padlock size={22} />
+            <span className="text-[15px] font-bold tracking-tight">
+              welock<span className="text-accentink">.in</span>
             </span>
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight">
-              Prêt à lock in ?
+            <h1
+              className="text-2xl font-bold text-ink"
+              style={{ letterSpacing: "-0.02em" }}
+            >
+              Hey, prêt à lock in ?
             </h1>
-            <p className="mt-1 text-sm font-medium text-zinc-500">
-              Choisis un pseudo pour commencer.
+            <p className="mt-1 text-sm text-text2">
+              Choisis un pseudo pour rejoindre ton crew.
             </p>
           </div>
           <input
@@ -163,14 +168,14 @@ export default function HomePage() {
             placeholder="Ton pseudo"
             maxLength={30}
             aria-label="Pseudo"
-            className="w-full rounded-xl border border-line2 bg-bg px-3.5 py-2.5 text-zinc-200 outline-none focus:border-accent"
+            className="w-full rounded-[11px] border border-strong bg-surface px-3.5 py-2.5 text-ink outline-none transition-colors duration-150 focus:border-accentink"
           />
           <button
             type="submit"
             disabled={!pseudoInput.trim()}
-            className="w-full rounded-xl bg-accent py-2.5 text-sm font-bold hover:brightness-110"
+            className="wl-lift w-full rounded-full bg-accent py-2.5 text-sm font-bold text-ink shadow-sm disabled:bg-track disabled:text-faint"
           >
-            Continuer
+            Lock in
           </button>
         </form>
       </main>
@@ -178,74 +183,83 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen pb-16 text-white">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-bg/85 px-7 py-4 backdrop-blur-md">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-accent text-[15px] font-extrabold">
-            W
-          </div>
-          <span className="text-[15px] font-extrabold tracking-wide">
-            WeLockIn
+    <div className="min-h-screen pb-16 text-ink">
+      <header
+        className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline px-7 py-4 backdrop-blur-md"
+        style={{ background: "rgba(239,234,224,.88)" }}
+      >
+        <div className="flex items-center gap-2 text-ink">
+          <Padlock size={22} />
+          <span className="text-[15px] font-bold tracking-tight">
+            welock<span className="text-accentink">.in</span>
           </span>
         </div>
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-2.5">
           <div
-            className="flex items-center gap-[7px] rounded-[10px] border border-line2 bg-panel px-3 py-[7px]"
+            className="flex items-center gap-[7px] rounded-full border border-hairline bg-surface px-3 py-[7px] shadow-xs"
             title="Jours de focus consécutifs"
           >
             <svg
               width="14"
               height="14"
               viewBox="0 0 24 24"
-              fill="#6366f1"
+              fill="none"
+              stroke="#3a352d"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
               aria-hidden="true"
             >
-              <path d="M12 2c1 4 4 5 4 9a4 4 0 01-8 0c0-1 .5-2 1-2.5C9 11 9 13 11 13c0-2-1-3-1-5 0-3 1-5 2-6z" />
+              <path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z" />
             </svg>
-            <span className="font-mono text-[13px] font-semibold text-zinc-200">
+            <span className="text-[13px] font-bold text-ink tabular-nums">
               {stats.streak}
             </span>
-            <span className="text-xs font-medium text-zinc-400">
+            <span className="text-xs font-medium text-text3">
               {stats.streak > 1 ? "jours de suite" : "jour de suite"}
             </span>
           </div>
-          <button
-            onClick={() => {
-              clearPseudo();
-              setPseudoState(null);
-            }}
-            title={`${pseudo} — changer de pseudo`}
-            aria-label={`Connecté en tant que ${pseudo}. Changer de pseudo`}
-            className="flex h-[34px] w-[34px] items-center justify-center rounded-[11px] text-[13px] font-bold text-white hover:brightness-110"
-            style={{ background: avatarColor(pseudo) }}
-          >
-            {initials(pseudo)}
-          </button>
+          <SettingsMenu pseudo={pseudo} onPseudoChange={setPseudoState} />
+          <Avatar
+            username={pseudo}
+            tintKey={prefs.tint}
+            size={34}
+            rounded="11px"
+          />
         </div>
       </header>
 
       <main className="mx-auto max-w-[980px] px-7 pt-10">
-        <div className="mb-2 text-[13px] font-bold tracking-wider text-indigo-400">
-          {greeting}
+        <div className="animate-wl-rise">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[.06em] text-text2">
+            {greeting}
+          </div>
+          <h1
+            className="mb-1 text-3xl font-bold text-ink"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            Hey {pseudo}, lock in
+          </h1>
+          <p className="mb-7 text-[15px] text-text2">
+            Lance une room ou rejoins un crew qui étudie déjà.
+          </p>
         </div>
-        <h1 className="mb-1 text-3xl font-extrabold tracking-tight">
-          Prêt à lock in, {pseudo} ?
-        </h1>
-        <p className="mb-7 text-sm font-medium text-zinc-500">
-          Lance une room ou rejoins un crew qui étudie déjà.
-        </p>
 
-        <div className="wl-hero mb-8 grid grid-cols-[1.4fr_1fr] gap-3.5 max-[720px]:grid-cols-1">
-          <div className="relative overflow-hidden rounded-2xl border border-line2 bg-panel p-6">
-            <span
-              className="absolute -right-5 -top-8 h-[140px] w-[140px] rounded-full bg-accent blur-[50px] animate-wl-breathe"
-              aria-hidden="true"
-            />
-            <form onSubmit={createRoom} className="relative">
-              <div className="mb-2.5 text-xs font-bold uppercase tracking-[.12em] text-indigo-400">
+        <div
+          className="wl-hero mb-8 grid grid-cols-[1.4fr_1fr] gap-3.5 max-[720px]:grid-cols-1 animate-wl-rise"
+          style={{ animationDelay: ".04s" }}
+        >
+          <div className="rounded-[16px] border border-hairline bg-surface p-6 shadow-sm">
+            <form onSubmit={createRoom}>
+              <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
                 Nouvelle room
               </div>
-              <div className="mb-4 text-lg font-bold">Lance une focus room</div>
+              <div
+                className="mb-4 text-[21px] font-bold text-ink"
+                style={{ letterSpacing: "-0.02em" }}
+              >
+                Lance une focus room
+              </div>
               <div className="flex flex-col gap-2.5">
                 <input
                   value={newName}
@@ -253,7 +267,7 @@ export default function HomePage() {
                   placeholder="Nom (ex : Révisions orga chimie)"
                   maxLength={60}
                   aria-label="Nom de la room"
-                  className="w-full rounded-[10px] border border-line2 bg-bg px-3 py-2.5 text-sm text-zinc-200 outline-none focus:border-accent"
+                  className="w-full rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accentink"
                 />
                 <div className="flex gap-2.5 max-[560px]:flex-col">
                   <input
@@ -262,10 +276,10 @@ export default function HomePage() {
                     placeholder="Sujet (optionnel)"
                     maxLength={60}
                     aria-label="Sujet"
-                    className="min-w-0 flex-1 rounded-[10px] border border-line2 bg-bg px-3 py-2.5 text-sm text-zinc-200 outline-none focus:border-accent"
+                    className="min-w-0 flex-1 rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accentink"
                   />
-                  <div className="flex items-center gap-2 rounded-[10px] border border-line2 bg-bg px-3 py-2.5">
-                    <span className="text-sm text-zinc-500">Timer</span>
+                  <div className="flex items-center gap-2 rounded-[11px] border border-strong bg-surface px-3 py-2.5">
+                    <span className="text-sm text-text3">Timer</span>
                     <input
                       type="number"
                       min={1}
@@ -273,39 +287,32 @@ export default function HomePage() {
                       value={newMinutes}
                       onChange={(e) => setNewMinutes(Number(e.target.value))}
                       aria-label="Durée du timer en minutes"
-                      className="w-16 bg-transparent text-right font-mono text-sm outline-none"
+                      className="w-16 bg-transparent text-right text-sm text-ink outline-none tabular-nums"
                     />
-                    <span className="text-sm text-zinc-500">min</span>
+                    <span className="text-sm text-text3">min</span>
                   </div>
                 </div>
                 <button
                   type="submit"
-                  className="mt-1 inline-flex w-fit items-center gap-2 rounded-[11px] bg-accent px-[18px] py-[11px] text-sm font-bold hover:brightness-110"
+                  className="wl-lift mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-accent px-5 py-[11px] text-sm font-bold text-ink shadow-sm"
                 >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  Créer &amp; rejoindre
+                  <Padlock size={15} locked />
+                  Lock in
                 </button>
               </div>
             </form>
           </div>
 
-          <div className="flex flex-col rounded-2xl border border-line2 bg-panel p-6">
-            <div className="mb-2.5 text-xs font-bold uppercase tracking-[.12em] text-zinc-500">
+          <div className="flex flex-col rounded-[16px] border border-hairline bg-card p-6 shadow-xs">
+            <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
               Rejoindre
             </div>
-            <div className="mb-4 text-lg font-bold">Tu as un code ?</div>
+            <div
+              className="mb-4 text-[21px] font-bold text-ink"
+              style={{ letterSpacing: "-0.02em" }}
+            >
+              Tu as un code ?
+            </div>
             <form onSubmit={joinByCode} className="mt-auto">
               <div className="flex gap-2">
                 <input
@@ -314,22 +321,22 @@ export default function HomePage() {
                     setCodeInput(e.target.value);
                     setCodeError(false);
                   }}
-                  placeholder="FOCUS-0000"
+                  placeholder="FOCUS-00000"
                   maxLength={20}
                   aria-label="Code de la room"
                   aria-invalid={codeError}
-                  className={`min-w-0 flex-1 rounded-[10px] border bg-bg px-3 py-2.5 font-mono text-sm font-semibold uppercase tracking-wider text-zinc-200 outline-none focus:border-accent ${
-                    codeError ? "border-red-400" : "border-line2"
+                  className={`min-w-0 flex-1 rounded-[11px] border bg-surface px-3 py-2.5 text-sm font-semibold uppercase tracking-wider text-ink outline-none transition-colors duration-150 focus:border-accentink ${
+                    codeError ? "border-danger" : "border-strong"
                   }`}
                 />
                 <button
                   type="submit"
                   aria-label="Rejoindre avec le code"
                   disabled={!codeInput.trim()}
-                  className={`flex w-[42px] min-w-[42px] items-center justify-center rounded-[10px] border ${
+                  className={`wl-lift flex w-[42px] min-w-[42px] items-center justify-center rounded-[11px] border ${
                     codeInput.trim()
-                      ? "border-accent bg-accent text-white"
-                      : "border-line2 bg-bg text-zinc-500"
+                      ? "border-transparent bg-ink text-surface shadow-sm"
+                      : "border-strong bg-surface text-faint"
                   }`}
                 >
                   <svg
@@ -338,7 +345,7 @@ export default function HomePage() {
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth="2.2"
+                    strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     aria-hidden="true"
@@ -348,7 +355,7 @@ export default function HomePage() {
                 </button>
               </div>
               {codeError && (
-                <p className="mt-2 text-xs font-medium text-red-400" role="alert">
+                <p className="mt-2 text-xs font-medium text-danger" role="alert">
                   Ce code ne ressemble pas à un code de room.
                 </p>
               )}
@@ -356,114 +363,135 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="wl-stats mb-9 grid grid-cols-3 gap-3.5 max-[560px]:grid-cols-1">
-          <div className="rounded-2xl border border-line bg-panel px-5 py-[18px]">
-            <div className="font-mono text-2xl font-bold tracking-tight text-white">
-              {formatHours(stats.today)}
+        <div
+          className="wl-stats mb-9 grid grid-cols-3 gap-3.5 max-[560px]:grid-cols-1 animate-wl-rise"
+          style={{ animationDelay: ".08s" }}
+        >
+          <div className="rounded-[14px] border border-hairline bg-card px-5 py-[18px] shadow-xs">
+            <div
+              className="text-2xl font-bold text-ink tabular-nums"
+              style={{ letterSpacing: "-0.02em" }}
+            >
+              {formatShortDuration(stats.today)}
             </div>
-            <div className="mt-1 text-xs font-semibold text-zinc-400">
-              Focus aujourd&apos;hui (h)
+            <div className="mt-1 text-[13px] text-text3">
+              Focus aujourd&apos;hui
             </div>
           </div>
-          <div className="rounded-2xl border border-line bg-panel px-5 py-[18px]">
-            <div className="font-mono text-2xl font-bold tracking-tight text-indigo-400">
+          <div className="rounded-[14px] border border-hairline bg-card px-5 py-[18px] shadow-xs">
+            <div
+              className="text-2xl font-bold text-ink tabular-nums"
+              style={{ letterSpacing: "-0.02em" }}
+            >
               {stats.streak}
             </div>
-            <div className="mt-1 text-xs font-semibold text-zinc-400">
-              Jours de suite
+            <div className="mt-1 text-[13px] text-text3">
+              {stats.streak > 1 ? "Jours de suite" : "Jour de suite"}
             </div>
           </div>
-          <div className="rounded-2xl border border-line bg-panel px-5 py-[18px]">
-            <div className="font-mono text-2xl font-bold tracking-tight text-white">
-              {formatHours(stats.week)}
+          <div className="rounded-[14px] border border-hairline bg-card px-5 py-[18px] shadow-xs">
+            <div
+              className="text-2xl font-bold text-ink tabular-nums"
+              style={{ letterSpacing: "-0.02em" }}
+            >
+              {stats.week >= 3600
+                ? `${Math.round(stats.week / 3600)}h`
+                : formatShortDuration(stats.week)}
             </div>
-            <div className="mt-1 text-xs font-semibold text-zinc-400">
-              Cette semaine (h)
-            </div>
+            <div className="mt-1 text-[13px] text-text3">Cette semaine</div>
           </div>
         </div>
 
-        <div className="mb-3.5 flex items-center justify-between">
-          <h2 className="text-base font-bold">Rooms en direct</h2>
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500">
-            <span
-              className="h-[7px] w-[7px] rounded-full bg-green-500 animate-wl-live"
-              aria-hidden="true"
-            />
-            {liveCount} en train d&apos;étudier
-          </span>
-        </div>
-
-        {rooms.length === 0 ? (
-          <div className="rounded-2xl border border-line bg-panel px-5 py-8 text-center text-sm font-medium text-zinc-500">
-            Aucune room active pour l&apos;instant. Lance la tienne !
+        <div
+          className="animate-wl-rise"
+          style={{ animationDelay: ".12s" }}
+        >
+          <div className="mb-3.5 flex items-center justify-between">
+            <h2
+              className="text-base font-bold text-ink"
+              style={{ letterSpacing: "-0.02em" }}
+            >
+              Rooms en direct
+            </h2>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-text2">
+              <span
+                className="h-[7px] w-[7px] rounded-full animate-wl-live"
+                style={{ background: "#54a078" }}
+                aria-hidden="true"
+              />
+              {liveCount} en train d&apos;étudier
+            </span>
           </div>
-        ) : (
-          <ul className="flex list-none flex-col gap-2.5 p-0">
-            {rooms.map((r) => {
-              const remaining = r.durationSec - (now - r.startedAt) / 1000;
-              return (
-                <li
-                  key={r.id}
-                  className={`flex items-center gap-4 rounded-2xl border bg-panel p-3.5 px-4 max-[560px]:flex-wrap ${
-                    r.deep ? "border-indigo-500/30" : "border-line"
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-center gap-2">
-                      <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-bold text-white">
-                        {r.name}
-                      </span>
-                      {r.deep && (
-                        <span className="whitespace-nowrap rounded-md border border-indigo-500/40 bg-indigo-500/15 px-[7px] py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-200">
-                          Deep Focus
+
+          {rooms.length === 0 ? (
+            <div className="rounded-[14px] border border-hairline bg-card px-5 py-8 text-center text-sm text-text3">
+              Aucune room active pour l&apos;instant. Lance la tienne.
+            </div>
+          ) : (
+            <ul className="flex list-none flex-col gap-2.5 p-0">
+              {rooms.map((r) => {
+                const remaining = r.durationSec - (now - r.startedAt) / 1000;
+                return (
+                  <li
+                    key={r.id}
+                    className="wl-lift flex items-center gap-4 rounded-[14px] border border-hairline bg-surface p-3.5 px-4 shadow-xs max-[560px]:flex-wrap"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-semibold text-ink">
+                          {r.name}
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-mono text-xs font-semibold text-indigo-400">
-                        {remaining > 0
-                          ? `Focus ${formatClock(remaining)}`
-                          : "Terminé"}
-                      </span>
-                      {r.subject && (
-                        <>
-                          <span className="text-xs text-zinc-600">·</span>
-                          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-zinc-400">
+                        {r.deep && (
+                          <span className="whitespace-nowrap rounded-full border border-hairline bg-sunken px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.06em] text-text2">
+                            Deep Focus
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <span className="rounded-full bg-sunken px-2 py-0.5 text-xs font-semibold text-text2 tabular-nums">
+                          {remaining > 0
+                            ? `Focus ${formatClock(remaining)}`
+                            : "Terminé"}
+                        </span>
+                        {r.subject && (
+                          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-text3">
                             {r.subject}
                           </span>
-                        </>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3.5 max-[560px]:w-full max-[560px]:justify-between">
-                    <div className="flex items-center">
-                      {r.peerNames.map((name, i) => (
-                        <div
-                          key={`${name}-${i}`}
-                          className="-ml-2 flex h-[30px] w-[30px] items-center justify-center rounded-full border-2 border-panel text-[11px] font-bold text-white first:ml-0"
-                          style={{ background: avatarColor(name) }}
-                          title={name}
-                        >
-                          {initials(name)}
-                        </div>
-                      ))}
-                      <span className="ml-2 text-[13px] font-semibold text-zinc-400">
-                        {r.peerCount}
-                      </span>
+                    <div className="flex items-center gap-3.5 max-[560px]:w-full max-[560px]:justify-between">
+                      <div className="flex items-center">
+                        {r.peerNames.map((name, i) => (
+                          <span key={`${name}-${i}`} className="-ml-2 first:ml-0">
+                            <Avatar
+                              username={name}
+                              size={30}
+                              rounded="50%"
+                              fontSize={11}
+                              ringColor="#fffefb"
+                            />
+                          </span>
+                        ))}
+                        <span className="ml-2 text-[13px] font-semibold text-text2 tabular-nums">
+                          {r.peerCount}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() =>
+                          router.push(`/room/${encodeURIComponent(r.id)}`)
+                        }
+                        className="rounded-full border border-strong bg-surface px-4 py-2 text-[13px] font-semibold text-ink transition-colors duration-150 hover:bg-ink hover:text-surface"
+                      >
+                        Rejoindre
+                      </button>
                     </div>
-                    <button
-                      onClick={() => router.push(`/room/${encodeURIComponent(r.id)}`)}
-                      className="rounded-[10px] border border-zinc-700 px-4 py-2 text-[13px] font-bold text-zinc-200 hover:border-accent hover:bg-indigo-500/10 hover:text-white"
-                    >
-                      Rejoindre
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </main>
     </div>
   );

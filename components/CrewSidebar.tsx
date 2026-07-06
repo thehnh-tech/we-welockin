@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { avatarColor, initials } from "@/lib/avatar";
-import { formatDuration } from "@/lib/time";
+import Avatar from "@/components/Avatar";
+import Padlock from "@/components/Padlock";
+import { formatShortDuration } from "@/lib/time";
 import type { RosterEntry } from "@/app/room/[id]/hooks/usePeerMesh";
 
 type Props = {
@@ -11,6 +12,7 @@ type Props = {
   roster: RosterEntry[];
   myPeerId: string | null;
   now: number;
+  locked: boolean; // session running -> the brand padlock is closed
   collapsed: boolean;
   mobOpen: boolean;
   onCollapse: () => void;
@@ -24,6 +26,7 @@ export default function CrewSidebar({
   roster,
   myPeerId,
   now,
+  locked,
   collapsed,
   mobOpen,
   onCollapse,
@@ -51,28 +54,27 @@ export default function CrewSidebar({
   return (
     <>
       <div
-        className={`wl-backdrop ${mobOpen ? "wl-mobopen" : ""} fixed inset-0 z-40 bg-black/55`}
+        className={`wl-backdrop ${mobOpen ? "wl-mobopen" : ""} fixed inset-0 z-40`}
+        style={{ background: "rgba(26,23,20,.35)" }}
         onClick={onCloseMobile}
         aria-hidden="true"
       />
       <aside
         className={`wl-sidebar ${collapsed ? "wl-collapsed" : ""} ${
           mobOpen ? "wl-mobopen" : ""
-        } flex h-screen flex-col overflow-hidden border-r border-line bg-panel`}
+        } flex h-screen flex-col overflow-hidden border-r border-hairline bg-cardalt`}
         aria-label="Participants"
       >
         <div className="px-[18px] pb-4 pt-5">
           <div className="mb-3.5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-accent text-[13px] font-extrabold">
-                W
-              </div>
-              <span className="text-[13px] font-bold tracking-wide text-zinc-200">
-                WeLockIn
+            <div className="flex items-center gap-2 text-ink">
+              <Padlock locked={locked} size={18} />
+              <span className="text-[13px] font-bold tracking-tight">
+                welock<span className="text-accentink">.in</span>
               </span>
             </div>
             <button
-              className="wl-collapsebtn h-[30px] w-[30px] items-center justify-center rounded-lg border border-line2 bg-transparent text-zinc-400 hover:bg-line hover:text-white"
+              className="wl-collapsebtn h-[30px] w-[30px] items-center justify-center rounded-[8px] border border-strong bg-surface text-text2 shadow-xs hover:text-ink"
               onClick={onCollapse}
               aria-label={mobOpen ? "Fermer le panneau" : "Replier le panneau"}
             >
@@ -91,24 +93,27 @@ export default function CrewSidebar({
               </svg>
             </button>
           </div>
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[.12em] text-zinc-500">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
             Session
           </div>
-          <div className="overflow-hidden text-ellipsis whitespace-nowrap text-base font-bold text-white">
+          <div
+            className="overflow-hidden text-ellipsis whitespace-nowrap text-base font-bold text-ink"
+            style={{ letterSpacing: "-0.02em" }}
+          >
             {sessionName}
           </div>
           {subject && (
-            <div className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-zinc-400">
+            <div className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-text2">
               {subject}
             </div>
           )}
         </div>
 
         <div className="flex items-center justify-between px-[18px] pb-2.5 pt-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-[.1em] text-zinc-500">
+          <span className="text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
             Crew · {roster.length}
           </span>
-          <span className="text-[11px] font-semibold text-indigo-400">
+          <span className="text-[11px] font-semibold text-text3">
             {focusedCount} en focus
           </span>
         </div>
@@ -121,31 +126,38 @@ export default function CrewSidebar({
               return (
                 <li
                   key={p.peerId}
-                  className={`flex items-center gap-[11px] rounded-xl border p-2 ${
+                  className={`flex items-center gap-[11px] rounded-[11px] border p-2 transition-colors duration-150 ${
                     isSelf
-                      ? "border-indigo-500/25 bg-indigo-500/10"
-                      : "border-transparent"
+                      ? "border-transparent bg-ink"
+                      : "border-transparent hover:bg-sunken"
                   }`}
                 >
-                  <div
-                    className="flex h-[34px] w-[34px] min-w-[34px] items-center justify-center rounded-xl text-[13px] font-bold text-white"
-                    style={{ background: avatarColor(p.username) }}
-                    aria-hidden="true"
-                  >
-                    {initials(p.username)}
-                  </div>
+                  <Avatar
+                    username={p.username}
+                    tintKey={p.status.tint}
+                    size={34}
+                    rounded="11px"
+                  />
                   <div className="min-w-0 flex-1">
-                    <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold text-zinc-200">
+                    <div
+                      className={`overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold ${
+                        isSelf ? "text-surface" : "text-ink"
+                      }`}
+                    >
                       {p.username}
                       {isSelf && " (toi)"}
                     </div>
                     <div className="mt-0.5 flex items-center gap-1.5">
                       <span
                         className="h-1.5 w-1.5 rounded-full"
-                        style={{ background: away ? "#a1a1aa" : "#6366f1" }}
+                        style={{ background: away ? "#b3aa9b" : "#54a078" }}
                         aria-hidden="true"
                       />
-                      <span className="text-[11px] font-medium text-zinc-400">
+                      <span
+                        className={`text-[11px] font-medium ${
+                          isSelf ? "text-surface/70" : "text-text3"
+                        }`}
+                      >
                         {away
                           ? "Absent"
                           : p.status.deep
@@ -155,11 +167,11 @@ export default function CrewSidebar({
                     </div>
                   </div>
                   <span
-                    className={`font-mono text-[11px] font-semibold ${
-                      isSelf ? "text-indigo-400" : "text-zinc-400"
+                    className={`text-[11px] font-semibold tabular-nums ${
+                      isSelf ? "text-surface/80" : "text-text3"
                     }`}
                   >
-                    {formatDuration((now - p.joinedAt) / 1000)}
+                    {formatShortDuration((now - p.joinedAt) / 1000)}
                   </span>
                 </li>
               );
@@ -170,7 +182,7 @@ export default function CrewSidebar({
         <div className="border-t border-line px-[18px] pb-[18px] pt-3">
           <button
             onClick={onLeave}
-            className="flex w-full items-center gap-2 rounded-lg p-2 text-left text-[13px] font-semibold text-zinc-400 hover:bg-red-400/10 hover:text-red-400"
+            className="flex w-full items-center gap-2 rounded-full px-3 py-2 text-left text-[13px] font-semibold text-text2 transition-colors duration-150 hover:bg-dangertint hover:text-danger"
           >
             <svg
               width="15"
@@ -187,7 +199,7 @@ export default function CrewSidebar({
               <path d="M16 17l5-5-5-5" />
               <path d="M21 12H9" />
             </svg>
-            Quitter
+            Quitter la session
           </button>
         </div>
       </aside>

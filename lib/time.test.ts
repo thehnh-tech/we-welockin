@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, formatDuration, formatHours } from "./time";
+import { formatClock, formatShortDuration } from "./time";
 
 describe("formatClock", () => {
   it("pads minutes and seconds", () => {
@@ -20,18 +20,11 @@ describe("formatClock", () => {
   });
 });
 
-describe("formatDuration", () => {
-  it("always shows an hours digit", () => {
-    expect(formatDuration(0)).toBe("0:00:00");
-    expect(formatDuration(3530)).toBe("0:58:50");
-    expect(formatDuration(8091)).toBe("2:14:51");
-  });
-});
-
-describe("formatHours", () => {
-  it("formats compact h:mm", () => {
-    expect(formatHours(0)).toBe("0:00");
-    expect(formatHours(6120)).toBe("1:42");
-    expect(formatHours(38 * 3600)).toBe("38:00");
+describe("formatShortDuration", () => {
+  it("formats rounded human durations", () => {
+    expect(formatShortDuration(0)).toBe("0m");
+    expect(formatShortDuration(2520)).toBe("42m");
+    expect(formatShortDuration(6120)).toBe("1h 42m");
+    expect(formatShortDuration(38 * 3600)).toBe("38h 00m");
   });
 });
