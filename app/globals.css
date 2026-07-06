@@ -33,9 +33,9 @@ select {
   color: #c4bbac;
 }
 
-/* Visible keyboard focus — accent, jamais décoratif ailleurs. */
+/* Visible keyboard focus — accent ink (>=3:1 on every paper surface). */
 :focus-visible {
-  outline: 2px solid #e07856;
+  outline: 2px solid #c25a3a;
   outline-offset: 2px;
 }
 

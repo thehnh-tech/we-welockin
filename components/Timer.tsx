@@ -66,11 +66,14 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
   const progress = Math.min(1, Math.max(0, elapsedSec / durationSec));
 
   // End-of-session feedback: fire exactly once, and only for a *fresh* finish
-  // (not when opening a room whose timer ended long ago).
+  // (not when opening a room whose timer ended long ago). Depends on `finished`
+  // only — depending on the ticking remainingSec would re-run the effect every
+  // 500ms and its cleanup would kill the title flash after one tick.
   useEffect(() => {
     if (!finished || firedRef.current) return;
     firedRef.current = true;
-    if (remainingSec <= -2) return; // joined an already-ended session
+    const rem = durationSec - Math.floor((Date.now() - startedAt) / 1000);
+    if (rem <= -2) return; // joined an already-ended session
 
     const prefs = getPrefs();
     if (prefs.sound) playChime();
@@ -109,10 +112,18 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
     if (reduceMotion) {
       document.title = "Session terminée — welock.in";
     } else {
+      // Bounded flash (~5 cycles) then a static title — the charter forbids
+      // endless looping animations outside live states.
       let on = false;
+      let cycles = 0;
       titleTimer = setInterval(() => {
         document.title = on ? original : "Session terminée — welock.in";
         on = !on;
+        if (++cycles >= 10) {
+          if (titleTimer) clearInterval(titleTimer);
+          titleTimer = null;
+          document.title = "Session terminée — welock.in";
+        }
       }, 1000);
     }
 
@@ -124,7 +135,7 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
       document.removeEventListener("visibilitychange", onVisible);
       restore();
     };
-  }, [finished, remainingSec]);
+  }, [finished, startedAt, durationSec]);
 
   const ringPx = big ? 300 : 190;
   const strokeW = big ? 11 : 8;
@@ -179,7 +190,7 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
           aria-hidden="true"
         >
           <span
-            className="mb-1 flex items-center gap-1.5 font-semibold uppercase text-text3"
+            className="mb-1 flex items-center gap-1.5 font-semibold uppercase text-text2"
             style={{ fontSize: 11, letterSpacing: ".06em" }}
           >
             {!finished && (

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Avatar from "@/components/Avatar";
 import Padlock from "@/components/Padlock";
-import { formatDuration } from "@/lib/time";
+import { formatShortDuration } from "@/lib/time";
 import type { RosterEntry } from "@/app/room/[id]/hooks/usePeerMesh";
 
 type Props = {
@@ -113,7 +113,7 @@ export default function CrewSidebar({
           <span className="text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
             Crew · {roster.length}
           </span>
-          <span className="text-[11px] font-semibold text-accentink">
+          <span className="text-[11px] font-semibold text-text3">
             {focusedCount} en focus
           </span>
         </div>
@@ -150,7 +150,7 @@ export default function CrewSidebar({
                     <div className="mt-0.5 flex items-center gap-1.5">
                       <span
                         className="h-1.5 w-1.5 rounded-full"
-                        style={{ background: away ? "#b3aa9b" : "#e07856" }}
+                        style={{ background: away ? "#b3aa9b" : "#54a078" }}
                         aria-hidden="true"
                       />
                       <span
@@ -171,7 +171,7 @@ export default function CrewSidebar({
                       isSelf ? "text-surface/80" : "text-text3"
                     }`}
                   >
-                    {formatDuration((now - p.joinedAt) / 1000)}
+                    {formatShortDuration((now - p.joinedAt) / 1000)}
                   </span>
                 </li>
               );

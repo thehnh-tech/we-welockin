@@ -168,12 +168,12 @@ export default function HomePage() {
             placeholder="Ton pseudo"
             maxLength={30}
             aria-label="Pseudo"
-            className="w-full rounded-[11px] border border-strong bg-surface px-3.5 py-2.5 text-ink outline-none transition-colors duration-150 focus:border-accent"
+            className="w-full rounded-[11px] border border-strong bg-surface px-3.5 py-2.5 text-ink outline-none transition-colors duration-150 focus:border-accentink"
           />
           <button
             type="submit"
             disabled={!pseudoInput.trim()}
-            className="wl-lift w-full rounded-full bg-accent py-2.5 text-sm font-semibold text-surface shadow-sm disabled:bg-track disabled:text-faint"
+            className="wl-lift w-full rounded-full bg-accent py-2.5 text-sm font-bold text-ink shadow-sm disabled:bg-track disabled:text-faint"
           >
             Lock in
           </button>
@@ -204,7 +204,7 @@ export default function HomePage() {
               height="14"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#c25a3a"
+              stroke="#3a352d"
               strokeWidth="1.8"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -231,7 +231,7 @@ export default function HomePage() {
 
       <main className="mx-auto max-w-[980px] px-7 pt-10">
         <div className="animate-wl-rise">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[.06em] text-text2">
             {greeting}
           </div>
           <h1
@@ -251,7 +251,7 @@ export default function HomePage() {
         >
           <div className="rounded-[16px] border border-hairline bg-surface p-6 shadow-sm">
             <form onSubmit={createRoom}>
-              <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-accentink">
+              <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
                 Nouvelle room
               </div>
               <div
@@ -267,7 +267,7 @@ export default function HomePage() {
                   placeholder="Nom (ex : Révisions orga chimie)"
                   maxLength={60}
                   aria-label="Nom de la room"
-                  className="w-full rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accent"
+                  className="w-full rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accentink"
                 />
                 <div className="flex gap-2.5 max-[560px]:flex-col">
                   <input
@@ -276,7 +276,7 @@ export default function HomePage() {
                     placeholder="Sujet (optionnel)"
                     maxLength={60}
                     aria-label="Sujet"
-                    className="min-w-0 flex-1 rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accent"
+                    className="min-w-0 flex-1 rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accentink"
                   />
                   <div className="flex items-center gap-2 rounded-[11px] border border-strong bg-surface px-3 py-2.5">
                     <span className="text-sm text-text3">Timer</span>
@@ -294,7 +294,7 @@ export default function HomePage() {
                 </div>
                 <button
                   type="submit"
-                  className="wl-lift mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-accent px-5 py-[11px] text-sm font-semibold text-surface shadow-sm"
+                  className="wl-lift mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-accent px-5 py-[11px] text-sm font-bold text-ink shadow-sm"
                 >
                   <Padlock size={15} locked />
                   Lock in
@@ -325,7 +325,7 @@ export default function HomePage() {
                   maxLength={20}
                   aria-label="Code de la room"
                   aria-invalid={codeError}
-                  className={`min-w-0 flex-1 rounded-[11px] border bg-surface px-3 py-2.5 text-sm font-semibold uppercase tracking-wider text-ink outline-none transition-colors duration-150 focus:border-accent ${
+                  className={`min-w-0 flex-1 rounded-[11px] border bg-surface px-3 py-2.5 text-sm font-semibold uppercase tracking-wider text-ink outline-none transition-colors duration-150 focus:border-accentink ${
                     codeError ? "border-danger" : "border-strong"
                   }`}
                 />
@@ -413,9 +413,10 @@ export default function HomePage() {
             >
               Rooms en direct
             </h2>
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-text3">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-text2">
               <span
-                className="h-[7px] w-[7px] rounded-full bg-accent animate-wl-live"
+                className="h-[7px] w-[7px] rounded-full animate-wl-live"
+                style={{ background: "#54a078" }}
                 aria-hidden="true"
               />
               {liveCount} en train d&apos;étudier
@@ -447,7 +448,7 @@ export default function HomePage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2.5">
-                        <span className="rounded-full bg-accenttint px-2 py-0.5 text-xs font-semibold text-accentink tabular-nums">
+                        <span className="rounded-full bg-sunken px-2 py-0.5 text-xs font-semibold text-text2 tabular-nums">
                           {remaining > 0
                             ? `Focus ${formatClock(remaining)}`
                             : "Terminé"}

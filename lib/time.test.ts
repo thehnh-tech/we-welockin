@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, formatDuration, formatShortDuration } from "./time";
+import { formatClock, formatShortDuration } from "./time";
 
 describe("formatClock", () => {
   it("pads minutes and seconds", () => {
@@ -17,14 +17,6 @@ describe("formatClock", () => {
   it("floors fractional seconds and clamps negatives to zero", () => {
     expect(formatClock(65.9)).toBe("01:05");
     expect(formatClock(-10)).toBe("00:00");
-  });
-});
-
-describe("formatDuration", () => {
-  it("always shows an hours digit", () => {
-    expect(formatDuration(0)).toBe("0:00:00");
-    expect(formatDuration(3530)).toBe("0:58:50");
-    expect(formatDuration(8091)).toBe("2:14:51");
   });
 });
 

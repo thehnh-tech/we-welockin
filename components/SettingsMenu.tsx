@@ -60,6 +60,11 @@ export default function SettingsMenu({ pseudo, onPseudoChange }: Props) {
     setName(pseudo ?? "");
   }, [pseudo]);
 
+  // Move focus into the dialog when it opens (screen readers announce it).
+  useEffect(() => {
+    if (open) panelRef.current?.focus();
+  }, [open]);
+
   // Escape + outside click close the panel.
   useEffect(() => {
     if (!open) return;
@@ -135,7 +140,8 @@ export default function SettingsMenu({ pseudo, onPseudoChange }: Props) {
           ref={panelRef}
           role="dialog"
           aria-label="Réglages de l'interface"
-          className="absolute right-0 top-[42px] z-50 w-[300px] rounded-[20px] border border-hairline bg-surface p-4 shadow-modal animate-wl-rise"
+          tabIndex={-1}
+          className="absolute right-0 top-[42px] z-50 w-[300px] rounded-[20px] border border-hairline bg-surface p-4 shadow-modal outline-none animate-wl-rise"
         >
           <div className="mb-3 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
             Réglages
@@ -156,7 +162,7 @@ export default function SettingsMenu({ pseudo, onPseudoChange }: Props) {
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && savePseudo()}
                   maxLength={30}
-                  className="min-w-0 flex-1 rounded-[11px] border border-strong bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+                  className="min-w-0 flex-1 rounded-[11px] border border-strong bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accentink"
                 />
                 <button
                   onClick={savePseudo}
@@ -177,12 +183,31 @@ export default function SettingsMenu({ pseudo, onPseudoChange }: Props) {
               className="flex flex-wrap items-center gap-2"
               role="radiogroup"
               aria-label="Teinte de ton avatar"
+              onKeyDown={(e) => {
+                // Roving radio pattern: arrows move + select.
+                const keys = ["", ...TINTS.map((t) => t.key)];
+                const i = keys.indexOf(prefs.tint);
+                let next: number | null = null;
+                if (e.key === "ArrowRight" || e.key === "ArrowDown")
+                  next = (i + 1) % keys.length;
+                else if (e.key === "ArrowLeft" || e.key === "ArrowUp")
+                  next = (i - 1 + keys.length) % keys.length;
+                else if (e.key === "Home") next = 0;
+                else if (e.key === "End") next = keys.length - 1;
+                if (next === null) return;
+                e.preventDefault();
+                setPrefs({ tint: keys[next] });
+                const radios =
+                  e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]');
+                radios[next]?.focus();
+              }}
             >
               <button
                 role="radio"
                 aria-checked={prefs.tint === ""}
                 aria-label="Automatique"
                 title="Automatique"
+                tabIndex={prefs.tint === "" ? 0 : -1}
                 onClick={() => setPrefs({ tint: "" })}
                 className="flex h-7 w-7 items-center justify-center rounded-full border bg-sunken text-[11px] font-bold text-text2"
                 style={{
@@ -200,14 +225,31 @@ export default function SettingsMenu({ pseudo, onPseudoChange }: Props) {
                   aria-checked={prefs.tint === t.key}
                   aria-label={t.label}
                   title={t.label}
+                  tabIndex={prefs.tint === t.key ? 0 : -1}
                   onClick={() => setPrefs({ tint: t.key })}
-                  className="h-7 w-7 rounded-full border transition-transform duration-150 ease-wl hover:scale-110"
+                  className="flex h-7 w-7 items-center justify-center rounded-full border transition-transform duration-150 ease-wl hover:scale-110"
                   style={{
                     background: t.bg,
                     borderColor: prefs.tint === t.key ? "#1a1714" : t.fg,
                     borderWidth: prefs.tint === t.key ? 2 : 1,
                   }}
-                />
+                >
+                  {prefs.tint === t.key && (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#1a1714"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  )}
+                </button>
               ))}
             </div>
           </div>

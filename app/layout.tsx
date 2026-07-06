@@ -23,6 +23,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr" className={figtree.variable}>
+      <head>
+        {/* Apply the user's reduced-animations preference before first paint
+            (same pattern as dark-mode anti-flash scripts). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{if(JSON.parse(localStorage.getItem("wlis_prefs_v1")||"{}").reducedMotion===true)document.documentElement.classList.add("wl-reduce")}catch(e){}',
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );

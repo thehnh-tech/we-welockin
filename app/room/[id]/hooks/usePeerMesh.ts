@@ -23,7 +23,7 @@ export type RosterEntry = {
 export type Remote = { username: string; stream: MediaStream };
 
 const STALL_HINT =
-  "Connexion difficile avec les autres participants. Sur certains réseaux (NAT strict, 4G, Wi-Fi d'entreprise), un serveur TURN est nécessaire.";
+  "Impossible de te connecter aux autres sur ce réseau — certains Wi-Fi (entreprise, 4G) bloquent la vidéo. Essaie un autre réseau.";
 
 // The WebRTC mesh: signaling presence via REST, calling every other peer
 // (lower id initiates), and tracking remote streams. The room metadata and the
@@ -100,8 +100,9 @@ export function usePeerMesh(opts: {
           // surface it instead of failing presence silently. 5xx stays quiet —
           // transient server errors resolve on the next heartbeat.
           if (res.status >= 400 && res.status < 500 && !cancelled) {
+            console.error("announce rejected", res.status);
             setConnWarning(
-              `Le serveur a refusé la mise à jour de présence (${res.status}). Recharge la page ou vérifie le lien.`
+              "Ce lien semble invalide. Recharge la page ou demande un nouveau lien."
             );
           }
           return;

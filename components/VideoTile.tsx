@@ -107,13 +107,13 @@ export default function VideoTile({
 
       {/* Top-left: Deep Focus badge (own tile). */}
       {deepBadge && !compact && (
-        <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full border border-accent bg-accenttint px-2.5 py-1">
+        <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full border border-hairline bg-sunken px-2.5 py-1 shadow-xs">
           <svg
             width="12"
             height="12"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#c25a3a"
+            stroke="#3a352d"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -122,7 +122,7 @@ export default function VideoTile({
             <path d="M3 18v-6a9 9 0 0118 0v6" />
             <path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
           </svg>
-          <span className="text-[10px] font-semibold uppercase tracking-[.06em] text-accentink">
+          <span className="text-[10px] font-semibold uppercase tracking-[.06em] text-text2">
             Deep Focus
           </span>
         </div>

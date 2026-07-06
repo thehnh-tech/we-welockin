@@ -10,7 +10,7 @@ import {
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getPseudo } from "@/lib/cookies";
 import { displayRoomCode } from "@/lib/roomCode";
-import { formatDuration } from "@/lib/time";
+import { formatShortDuration } from "@/lib/time";
 import { usePrefs } from "@/lib/prefs";
 import VideoTile from "@/components/VideoTile";
 import Timer from "@/components/Timer";
@@ -52,12 +52,12 @@ function ControlPill({
       disabled={disabled}
       aria-pressed={pressed}
       aria-label={label}
-      className={`wl-lift flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold ${
+      className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold ${
         disabled
           ? "border-hairline bg-card text-faint"
           : pressed
-            ? "border-transparent bg-ink text-surface shadow-sm"
-            : "border-strong bg-surface text-ink2 shadow-xs hover:text-ink"
+            ? "wl-lift border-transparent bg-ink text-surface shadow-sm"
+            : "wl-lift border-strong bg-surface text-ink2 shadow-xs hover:text-ink"
       }`}
     >
       {children}
@@ -490,7 +490,7 @@ function RoomInner() {
             deepBadge={deep}
             focusTime={
               selfEntry
-                ? formatDuration((now - selfEntry.joinedAt) / 1000)
+                ? formatShortDuration((now - selfEntry.joinedAt) / 1000)
                 : undefined
             }
           />
@@ -511,7 +511,7 @@ function RoomInner() {
                 dimmed={!!st?.away}
                 focusTime={
                   entry
-                    ? formatDuration((now - entry.joinedAt) / 1000)
+                    ? formatShortDuration((now - entry.joinedAt) / 1000)
                     : undefined
                 }
               />
