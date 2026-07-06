@@ -212,6 +212,28 @@ sur les 2 pages, Figtree actif, réglages persistés + teinte visible dans le ro
 
 ---
 
+## Phase 6b — Theming v2 : zones encre + customisation réelle ✅ FAIT (branche `phase-7-theming`)
+
+**Retour utilisateur :** pas assez smooth, options sans effet visible, thème clair mal reçu,
+layout trop plat/générique. Réponse :
+
+- [x] **Architecture de theming en variables CSS** — toutes les couleurs passent par `--wl-*`,
+      pilotées par `data-wl-theme` / `data-wl-accent` sur `<html>` (anti-flash au premier paint).
+- [x] **Thème Papier / Encre** — mode sombre chaud complet (jamais de gris froid).
+- [x] **6 accents** (terracotta, vert, bleu, violet, sarcelle, ambre) — CTA, ring, dots suivent en live.
+- [x] **Customisation du timer** — style Anneau / Minimal (barre de progression), secondes on/off
+      (minutes arrondies sinon, dernière minute en secondes).
+- [x] **Zones contrastées** — bandeau encre en haut de la Home (header + héro 46px + stats en gros
+      chiffres) ; room : barre supérieure + sidebar encre continues (zone en L).
+- [x] **Fluidité** — switch de thème via View Transitions API (crossfade 300ms) ; fix du bug Chromium
+      « transitions globales + variables héritées » qui figeait les couleurs (cause racine du
+      « les options ne fonctionnent pas ») ; `suppressHydrationWarning` pattern next-themes.
+
+**Validation :** ✅ tsc, eslint, vitest 58/58, build ✅ Navigateur : bascule Papier↔Encre et accents
+en live mesurée au DOM, timer Minimal/« 25 min » vérifiés, room en zones encre, hydratation propre.
+
+---
+
 ## Phase 7 — Scale au-delà du mesh (à la demande)
 
 **Déclencheur :** besoin récurrent de > 5–6 participants par room.

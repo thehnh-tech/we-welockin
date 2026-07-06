@@ -2,11 +2,165 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+   Theme variables. Every color in the app reads from these, so switching the
+   theme or the accent (data attributes on <html>, set from the settings
+   panel) restyles the whole site instantly — and smoothly, via the global
+   color transitions below.
+--------------------------------------------------------------------------- */
+:root {
+  /* Papier (default) — warm paper surfaces, brown inks */
+  --wl-canvas: #efeae0;
+  --wl-surface: #fffefb;
+  --wl-card: #faf7f1;
+  --wl-cardalt: #fcfaf6;
+  --wl-sunken: #f2ede3;
+  --wl-track: #e7e1d6;
+
+  --wl-ink: #1a1714;
+  --wl-ink2: #3a352d;
+  --wl-text2: #5b5448;
+  --wl-text3: #7a7164;
+  --wl-muted: #8a8175;
+  --wl-faint: #b3aa9b;
+  --wl-placeholder: #c4bbac;
+
+  --wl-hairline: rgba(26, 23, 20, 0.06);
+  --wl-line: rgba(26, 23, 20, 0.08);
+  --wl-strong: rgba(26, 23, 20, 0.12);
+
+  --wl-danger: #a42b1b;
+  --wl-danger-tint: #f7e7e3;
+
+  /* Ink band — sidebar + page top zone (a different world than the canvas) */
+  --wl-band: #1a1714;
+  --wl-band-2: #241f1a;
+  --wl-band-text: #fffefb;
+  --wl-band-text2: rgba(255, 254, 251, 0.74);
+  --wl-band-text3: rgba(255, 254, 251, 0.52);
+  --wl-band-line: rgba(255, 254, 251, 0.13);
+  --wl-band-chip: rgba(255, 254, 251, 0.08);
+  --wl-band-active: #fffefb;
+  --wl-band-active-text: #1a1714;
+
+  --wl-scrollbar: #d6cfc2;
+  --wl-shadow-color: 26, 23, 20;
+
+  /* Accent (terracotta by default; overridden by [data-wl-accent]) */
+  --wl-accent: #e07856;
+  --wl-accent-strong: #c25a3a; /* filled CTAs, focus rings — AA with paper text */
+  --wl-accent-tint: #f5e4dd;
+}
+
+/* Encre — warm dark theme (never cold gray) */
+[data-wl-theme="encre"] {
+  --wl-canvas: #17130f;
+  --wl-surface: #211c16;
+  --wl-card: #262019;
+  --wl-cardalt: #1d1813;
+  --wl-sunken: #120f0c;
+  --wl-track: #3a3228;
+
+  --wl-ink: #f4efe6;
+  --wl-ink2: #ddd5c7;
+  --wl-text2: #c2b8a5;
+  --wl-text3: #a99e88;
+  --wl-muted: #7d7461;
+  --wl-faint: #5c5546;
+  --wl-placeholder: #4c4639;
+
+  --wl-hairline: rgba(244, 239, 230, 0.07);
+  --wl-line: rgba(244, 239, 230, 0.09);
+  --wl-strong: rgba(244, 239, 230, 0.15);
+
+  --wl-danger: #e06a55;
+  --wl-danger-tint: #3a1f1a;
+
+  --wl-band: #100d0a;
+  --wl-band-2: #191510;
+  --wl-band-text: #fffefb;
+  --wl-band-text2: rgba(255, 254, 251, 0.74);
+  --wl-band-text3: rgba(255, 254, 251, 0.52);
+  --wl-band-line: rgba(255, 254, 251, 0.13);
+  --wl-band-chip: rgba(255, 254, 251, 0.08);
+  --wl-band-active: #f4efe6;
+  --wl-band-active-text: #17130f;
+
+  --wl-scrollbar: #3f382e;
+  --wl-shadow-color: 0, 0, 0;
+}
+
+/* Accents — the strong variant is the filled/CTA color (AA with paper text) */
+[data-wl-accent="terracotta"] {
+  --wl-accent: #e07856;
+  --wl-accent-strong: #c25a3a;
+  --wl-accent-tint: #f5e4dd;
+}
+[data-wl-accent="vert"] {
+  --wl-accent: #54a078;
+  --wl-accent-strong: #3d7a5c;
+  --wl-accent-tint: #ddefdc;
+}
+[data-wl-accent="bleu"] {
+  --wl-accent: #5a7db8;
+  --wl-accent-strong: #46639a;
+  --wl-accent-tint: #dce8f3;
+}
+[data-wl-accent="violet"] {
+  --wl-accent: #8a6b96;
+  --wl-accent-strong: #71547e;
+  --wl-accent-tint: #ede3f0;
+}
+[data-wl-accent="sarcelle"] {
+  --wl-accent: #4f8a86;
+  --wl-accent-strong: #3d6f6c;
+  --wl-accent-tint: #d8e6e4;
+}
+[data-wl-accent="ambre"] {
+  --wl-accent: #b08646;
+  --wl-accent-strong: #8f6a2e;
+  --wl-accent-tint: #f4e7d6;
+}
+[data-wl-theme="encre"][data-wl-accent="terracotta"] {
+  --wl-accent-tint: #3c261e;
+}
+[data-wl-theme="encre"][data-wl-accent="vert"] {
+  --wl-accent-tint: #1d2f25;
+}
+[data-wl-theme="encre"][data-wl-accent="bleu"] {
+  --wl-accent-tint: #1f2836;
+}
+[data-wl-theme="encre"][data-wl-accent="violet"] {
+  --wl-accent-tint: #2c2331;
+}
+[data-wl-theme="encre"][data-wl-accent="sarcelle"] {
+  --wl-accent-tint: #1c2b2a;
+}
+[data-wl-theme="encre"][data-wl-accent="ambre"] {
+  --wl-accent-tint: #32281a;
+}
+
+/* --------------------------------------------------------------------------- */
+
 html,
 body {
-  background: #efeae0; /* canvas — papier chaud, jamais blanc pur */
-  color: #1a1714; /* encre */
+  background: var(--wl-canvas);
+  color: var(--wl-ink);
   min-height: 100vh;
+}
+
+/* Theme/accent switches: a blanket CSS transition on var-driven colors pins
+   stale values in Chromium, so switches instead go through the View
+   Transitions API (see lib/prefs.ts) with transitions briefly disabled. */
+html.wl-notransition *,
+html.wl-notransition *::before,
+html.wl-notransition *::after {
+  transition: none !important;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.3s;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 * {
@@ -14,12 +168,12 @@ body {
 }
 
 ::selection {
-  background: #f5e4dd; /* accent tint */
-  color: #1a1714;
+  background: var(--wl-accent-tint);
+  color: var(--wl-ink);
 }
 
 button:disabled {
-  color: #b3aa9b; /* faint */
+  color: var(--wl-faint);
   cursor: not-allowed;
 }
 
@@ -30,12 +184,12 @@ select {
 }
 
 ::placeholder {
-  color: #c4bbac;
+  color: var(--wl-placeholder);
 }
 
-/* Visible keyboard focus — accent ink (>=3:1 on every paper surface). */
+/* Visible keyboard focus. */
 :focus-visible {
-  outline: 2px solid #c25a3a;
+  outline: 2px solid var(--wl-accent-strong);
   outline-offset: 2px;
 }
 
@@ -43,7 +197,7 @@ select {
   width: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d6cfc2;
+  background: var(--wl-scrollbar);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-track {
@@ -62,23 +216,29 @@ select {
   border: 0;
 }
 
-/* Mouvement §08 : bref et feutré. Survol = levée + ombre LG ; appui = scale(.98).
-   Appliqué aux éléments interactifs marqués .wl-lift. */
+/* Mouvement : bref et feutré. Survol = levée + ombre ; appui = scale(.98). */
 .wl-lift {
   transition:
-    transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1),
-    box-shadow 0.18s cubic-bezier(0.2, 0.8, 0.3, 1),
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1),
+    box-shadow 0.25s cubic-bezier(0.2, 0.8, 0.3, 1),
+    background-color 0.2s cubic-bezier(0.2, 0.8, 0.3, 1),
+    border-color 0.2s cubic-bezier(0.2, 0.8, 0.3, 1),
+    color 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
-.wl-lift:hover {
+.wl-lift:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(26, 23, 20, 0.12);
+  box-shadow: 0 8px 24px rgba(var(--wl-shadow-color), 0.14);
 }
-.wl-lift:active {
+.wl-lift:active:not(:disabled) {
   transform: scale(0.98);
-  box-shadow: 0 1px 2px rgba(26, 23, 20, 0.04);
+  box-shadow: 0 1px 2px rgba(var(--wl-shadow-color), 0.05);
+}
+
+/* Leave button on the ink band: light danger on hover (dark brick would
+   vanish on ink). */
+.wl-band-danger:hover {
+  color: #f0907c;
+  background: var(--wl-band-chip);
 }
 
 /* Réduction de mouvement : préférence système OU réglage utilisateur. */
@@ -101,11 +261,12 @@ html.wl-reduce *::after {
 
 /* Room sidebar: collapsible on desktop, slide-in drawer on mobile. */
 .wl-sidebar {
-  width: 248px;
-  min-width: 248px;
+  width: 252px;
+  min-width: 252px;
   transition:
-    width 0.25s cubic-bezier(0.2, 0.8, 0.3, 1),
-    min-width 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+    width 0.3s cubic-bezier(0.2, 0.8, 0.3, 1),
+    min-width 0.3s cubic-bezier(0.2, 0.8, 0.3, 1),
+    background-color 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 .wl-sidebar.wl-collapsed {
   width: 0;
@@ -132,15 +293,15 @@ html.wl-reduce *::after {
     position: fixed;
     top: 0;
     left: 0;
-    width: 248px;
-    min-width: 248px;
+    width: 252px;
+    min-width: 252px;
     height: 100vh;
     transform: translateX(-100%);
     transition:
-      transform 0.28s cubic-bezier(0.2, 0.8, 0.3, 1),
-      visibility 0.28s;
+      transform 0.3s cubic-bezier(0.2, 0.8, 0.3, 1),
+      visibility 0.3s;
     z-index: 50;
-    box-shadow: 0 30px 80px rgba(26, 23, 20, 0.18);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
     /* Closed drawer: hidden from keyboard + screen readers. */
     visibility: hidden;
   }
@@ -149,8 +310,8 @@ html.wl-reduce *::after {
     visibility: visible;
   }
   .wl-sidebar.wl-collapsed {
-    width: 248px;
-    min-width: 248px;
+    width: 252px;
+    min-width: 252px;
   }
   .wl-openbtn {
     display: flex;

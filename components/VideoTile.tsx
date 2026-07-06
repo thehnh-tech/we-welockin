@@ -113,7 +113,7 @@ export default function VideoTile({
             height="12"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#3a352d"
+            style={{ stroke: "var(--wl-ink2)" }}
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"

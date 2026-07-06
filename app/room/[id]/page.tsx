@@ -272,88 +272,99 @@ function RoomInner() {
         onLeave={leave}
       />
 
-      <main className="relative h-screen min-w-0 flex-1 overflow-y-auto">
-        <button
-          className={`wl-openbtn ${collapsed ? "wl-show" : ""} wl-lift absolute left-[18px] top-[18px] z-20 h-10 w-10 items-center justify-center rounded-[11px] border border-strong bg-surface text-ink2 shadow-xs`}
-          onClick={() => {
-            setCollapsed(false);
-            setMobOpen(true);
-          }}
-          aria-label="Ouvrir le panneau des participants"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <path d="M3 6h18M3 12h18M3 18h18" />
-          </svg>
-        </button>
-
-        <div className="absolute right-[18px] top-[18px] z-20 flex items-center gap-2">
-          <div className="flex items-center gap-2 rounded-[11px] border border-hairline bg-surface py-[7px] pl-[13px] pr-[9px] shadow-xs">
-            <span className="text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
-              Room
-            </span>
-            <span className="text-sm font-bold tracking-wide text-ink tabular-nums">
-              {roomId ? displayRoomCode(roomId) : ""}
-            </span>
+      <main className="flex h-screen min-w-0 flex-1 flex-col">
+        {/* Ink band header — continuous with the sidebar zone. */}
+        <header className="flex items-center justify-between gap-3 border-b border-bandline bg-band px-4 py-3 text-bandtext">
+          <div className="flex min-w-0 items-center gap-3">
             <button
-              onClick={copyLink}
-              aria-label="Copier le lien d'invitation"
-              title="Copier le lien d'invitation"
-              className="flex h-7 w-7 items-center justify-center rounded-[8px] text-text2 transition-colors duration-150 hover:bg-sunken hover:text-ink"
+              className={`wl-openbtn ${collapsed ? "wl-show" : ""} h-9 w-9 items-center justify-center rounded-[10px] border border-bandline bg-bandchip text-bandtext2 transition-colors duration-150 hover:text-bandtext`}
+              onClick={() => {
+                setCollapsed(false);
+                setMobOpen(true);
+              }}
+              aria-label="Ouvrir le panneau des participants"
             >
-              {copied ? (
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#54a078"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-              ) : (
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="9" y="9" width="11" height="11" rx="2" />
-                  <path d="M5 15V5a2 2 0 012-2h10" />
-                </svg>
-              )}
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M3 6h18M3 12h18M3 18h18" />
+              </svg>
             </button>
+            <span
+              className="hidden min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-bold sm:block"
+              style={{ letterSpacing: "-0.01em" }}
+            >
+              {room?.name ?? ""}
+            </span>
           </div>
-          <SettingsMenu />
-        </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-[11px] border border-bandline bg-bandchip py-[6px] pl-[13px] pr-[8px]">
+              <span className="text-[11px] font-semibold uppercase tracking-[.06em] text-bandtext2">
+                Room
+              </span>
+              <span className="text-sm font-bold tracking-wide tabular-nums">
+                {roomId ? displayRoomCode(roomId) : ""}
+              </span>
+              <button
+                onClick={copyLink}
+                aria-label="Copier le lien d'invitation"
+                title="Copier le lien d'invitation"
+                className="flex h-7 w-7 items-center justify-center rounded-[8px] text-bandtext2 transition-colors duration-150 hover:bg-bandchip hover:text-bandtext"
+              >
+                {copied ? (
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#54a078"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="9" y="9" width="11" height="11" rx="2" />
+                    <path d="M5 15V5a2 2 0 012-2h10" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <SettingsMenu tone="band" />
+          </div>
+        </header>
 
+        <div className="min-h-0 flex-1 overflow-y-auto">
         {banner && (
           <div
             role="status"
-            className="mx-auto mt-[74px] flex max-w-xl items-center justify-between gap-3 rounded-[14px] border border-hairline bg-dangertint px-4 py-2.5 text-sm font-medium text-danger shadow-md animate-wl-toast"
+            className="mx-auto mt-4 flex max-w-xl items-center justify-between gap-3 rounded-[14px] border border-hairline bg-dangertint px-4 py-2.5 text-sm font-medium text-danger shadow-md animate-wl-toast"
           >
             <span>{banner}</span>
             <button
               onClick={dismissWarning}
               aria-label="Masquer l'avertissement"
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-danger/70 hover:bg-danger/10 hover:text-danger"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-sunken"
             >
               <svg
                 width="13"
@@ -373,7 +384,7 @@ function RoomInner() {
 
         <section
           className={`flex flex-col items-center px-6 ${
-            banner ? "pt-5" : focusMode ? "pt-[34px]" : "pt-16"
+            banner ? "pt-4" : focusMode ? "pt-7" : "pt-10"
           } pb-6 animate-wl-rise`}
         >
           {room && (
@@ -517,6 +528,7 @@ function RoomInner() {
               />
             );
           })}
+        </div>
         </div>
       </main>
     </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatClock } from "@/lib/time";
-import { getPrefs } from "@/lib/prefs";
+import { getPrefs, usePrefs } from "@/lib/prefs";
 
 type Props = {
   startedAt: number;
@@ -42,6 +42,7 @@ function playChime() {
 export default function Timer({ startedAt, durationSec, big = false }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const firedRef = useRef(false);
+  const prefs = usePrefs();
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 500);
@@ -75,11 +76,11 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
     const rem = durationSec - Math.floor((Date.now() - startedAt) / 1000);
     if (rem <= -2) return; // joined an already-ended session
 
-    const prefs = getPrefs();
-    if (prefs.sound) playChime();
+    const p = getPrefs();
+    if (p.sound) playChime();
 
     if (
-      prefs.notifications &&
+      p.notifications &&
       typeof Notification !== "undefined" &&
       Notification.permission === "granted"
     ) {
@@ -91,7 +92,7 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
     }
 
     const reduceMotion =
-      prefs.reducedMotion ||
+      p.reducedMotion ||
       (typeof window !== "undefined" &&
         window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
 
@@ -112,8 +113,7 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
     if (reduceMotion) {
       document.title = "Session terminée — welock.in";
     } else {
-      // Bounded flash (~5 cycles) then a static title — the charter forbids
-      // endless looping animations outside live states.
+      // Bounded flash (~5 cycles) then a static title.
       let on = false;
       let cycles = 0;
       titleTimer = setInterval(() => {
@@ -137,13 +137,81 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
     };
   }, [finished, startedAt, durationSec]);
 
+  // Display: with seconds ("24:31") or rounded minutes ("25 min"), the last
+  // minute always showing seconds so the end feels alive.
+  const showSeconds = prefs.timerSeconds || remainingSec <= 60;
+  const display = finished
+    ? "00:00"
+    : showSeconds
+      ? formatClock(remainingSec)
+      : `${Math.ceil(remainingSec / 60)} min`;
+
+  const minimal = prefs.timerStyle === "minimal";
   const ringPx = big ? 300 : 190;
   const strokeW = big ? 11 : 8;
   const r = ringPx / 2 - strokeW - 2;
   const mid = ringPx / 2;
   const circumference = 2 * Math.PI * r;
-  // Accent = the one live moment on screen; finished settles back to ink.
-  const color = finished ? "#1a1714" : "#e07856";
+  const color = finished ? "var(--wl-ink)" : "var(--wl-accent)";
+
+  const eyebrow = (
+    <span
+      className="mb-1 flex items-center gap-1.5 font-semibold uppercase text-text2"
+      style={{ fontSize: 11, letterSpacing: ".06em" }}
+    >
+      {!finished && (
+        <span
+          className="h-1.5 w-1.5 rounded-full animate-wl-live"
+          style={{ background: "var(--wl-accent)" }}
+        />
+      )}
+      {finished ? "Terminé" : "Focus"}
+    </span>
+  );
+
+  const srStatus = (
+    <span className="sr-only" role="status" aria-live="polite">
+      {finished ? "Session terminée" : ""}
+    </span>
+  );
+
+  if (minimal) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center py-6"
+        role="timer"
+        aria-label={
+          finished
+            ? "Session terminée"
+            : `Temps restant : ${formatClock(remainingSec)}`
+        }
+      >
+        <div aria-hidden="true" className="flex flex-col items-center">
+          {eyebrow}
+          <span
+            className="font-bold leading-none text-ink tabular-nums"
+            style={{ fontSize: big ? 96 : 64, letterSpacing: "-0.03em" }}
+          >
+            {display}
+          </span>
+          <span
+            className="mt-5 block h-[3px] w-44 overflow-hidden rounded-full"
+            style={{ background: "var(--wl-track)" }}
+          >
+            <span
+              className="block h-full rounded-full"
+              style={{
+                width: `${progress * 100}%`,
+                background: color,
+                transition: "width .5s linear, background-color .3s",
+              }}
+            />
+          </span>
+        </div>
+        {srStatus}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center">
@@ -169,7 +237,7 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
             cy={mid}
             r={r}
             fill="none"
-            stroke="#e7e1d6"
+            style={{ stroke: "var(--wl-track)" }}
             strokeWidth={strokeW}
           />
           <circle
@@ -177,42 +245,33 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
             cy={mid}
             r={r}
             fill="none"
-            stroke={color}
             strokeWidth={strokeW}
             strokeLinecap="round"
             strokeDasharray={`${circumference}`}
             strokeDashoffset={`${circumference * (1 - progress)}`}
-            style={{ transition: "stroke-dashoffset 0.5s linear, stroke .3s" }}
+            style={{
+              stroke: color,
+              transition: "stroke-dashoffset 0.5s linear, stroke .3s",
+            }}
           />
         </svg>
         <div
           className="absolute inset-0 flex flex-col items-center justify-center"
           aria-hidden="true"
         >
-          <span
-            className="mb-1 flex items-center gap-1.5 font-semibold uppercase text-text2"
-            style={{ fontSize: 11, letterSpacing: ".06em" }}
-          >
-            {!finished && (
-              <span
-                className="h-1.5 w-1.5 rounded-full animate-wl-live"
-                style={{ background: "#e07856" }}
-              />
-            )}
-            {finished ? "Terminé" : "Focus"}
-          </span>
+          {eyebrow}
           <span
             className="font-bold leading-none text-ink tabular-nums"
-            style={{ fontSize: big ? 72 : 46, letterSpacing: "-0.03em" }}
+            style={{
+              fontSize: big ? 68 : showSeconds ? 44 : 40,
+              letterSpacing: "-0.03em",
+            }}
           >
-            {finished ? "00:00" : formatClock(remainingSec)}
+            {display}
           </span>
         </div>
       </div>
-      {/* Announced once by screen readers when the session ends. */}
-      <span className="sr-only" role="status" aria-live="polite">
-        {finished ? "Session terminée" : ""}
-      </span>
+      {srStatus}
     </div>
   );
 }

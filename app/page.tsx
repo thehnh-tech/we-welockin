@@ -173,7 +173,8 @@ export default function HomePage() {
           <button
             type="submit"
             disabled={!pseudoInput.trim()}
-            className="wl-lift w-full rounded-full bg-accent py-2.5 text-sm font-bold text-ink shadow-sm disabled:bg-track disabled:text-faint"
+            className="wl-lift w-full rounded-full bg-accentink py-2.5 text-sm font-bold shadow-sm disabled:bg-track disabled:text-faint"
+            style={{ color: "#fffefb" }}
           >
             Lock in
           </button>
@@ -183,73 +184,119 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen pb-16 text-ink">
-      <header
-        className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline px-7 py-4 backdrop-blur-md"
-        style={{ background: "rgba(239,234,224,.88)" }}
-      >
-        <div className="flex items-center gap-2 text-ink">
-          <Padlock size={22} />
-          <span className="text-[15px] font-bold tracking-tight">
-            welock<span className="text-accentink">.in</span>
-          </span>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <div
-            className="flex items-center gap-[7px] rounded-full border border-hairline bg-surface px-3 py-[7px] shadow-xs"
-            title="Jours de focus consécutifs"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#3a352d"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z" />
-            </svg>
-            <span className="text-[13px] font-bold text-ink tabular-nums">
-              {stats.streak}
-            </span>
-            <span className="text-xs font-medium text-text3">
-              {stats.streak > 1 ? "jours de suite" : "jour de suite"}
+    <div className="min-h-screen pb-16">
+      {/* ---- Ink band: header + hero + stats — a different world than the
+             paper canvas below. ---- */}
+      <div className="bg-band text-bandtext">
+        <header className="mx-auto flex max-w-[1020px] items-center justify-between px-7 py-4">
+          <div className="flex items-center gap-2">
+            <Padlock size={22} />
+            <span className="text-[15px] font-bold tracking-tight">
+              welock<span className="text-accent">.in</span>
             </span>
           </div>
-          <SettingsMenu pseudo={pseudo} onPseudoChange={setPseudoState} />
-          <Avatar
-            username={pseudo}
-            tintKey={prefs.tint}
-            size={34}
-            rounded="11px"
-          />
-        </div>
-      </header>
+          <div className="flex items-center gap-2.5">
+            <div
+              className="flex items-center gap-[7px] rounded-full border border-bandline bg-bandchip px-3 py-[7px] text-bandtext2"
+              title="Jours de focus consécutifs"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z" />
+              </svg>
+              <span className="text-[13px] font-bold text-bandtext tabular-nums">
+                {stats.streak}
+              </span>
+              <span className="text-xs font-medium">
+                {stats.streak > 1 ? "jours de suite" : "jour de suite"}
+              </span>
+            </div>
+            <SettingsMenu
+              pseudo={pseudo}
+              onPseudoChange={setPseudoState}
+              tone="band"
+            />
+            <Avatar
+              username={pseudo}
+              tintKey={prefs.tint}
+              size={34}
+              rounded="11px"
+            />
+          </div>
+        </header>
 
-      <main className="mx-auto max-w-[980px] px-7 pt-10">
-        <div className="animate-wl-rise">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[.06em] text-text2">
+        <div className="mx-auto max-w-[1020px] px-7 pb-10 pt-7 animate-wl-rise">
+          <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.08em] text-bandtext2">
             {greeting}
           </div>
           <h1
-            className="mb-1 text-3xl font-bold text-ink"
-            style={{ letterSpacing: "-0.02em" }}
+            className="mb-2 font-bold"
+            style={{ fontSize: "clamp(30px, 5vw, 46px)", letterSpacing: "-0.03em", lineHeight: 1.05 }}
           >
-            Hey {pseudo}, lock in
+            Hey {pseudo},
+            <br />
+            <span className="text-accent">lock in.</span>
           </h1>
-          <p className="mb-7 text-[15px] text-text2">
+          <p className="mb-8 text-[15px] text-bandtext2">
             Lance une room ou rejoins un crew qui étudie déjà.
           </p>
-        </div>
 
+          <dl className="flex flex-wrap gap-x-10 gap-y-4">
+            <div className="min-w-[110px]">
+              <dt className="order-2 text-[13px] text-bandtext2">
+                Focus aujourd&apos;hui
+              </dt>
+              <dd
+                className="m-0 text-[30px] font-bold leading-tight tabular-nums"
+                style={{ letterSpacing: "-0.03em" }}
+              >
+                {formatShortDuration(stats.today)}
+              </dd>
+            </div>
+            <div className="min-w-[110px] border-l border-bandline pl-10 max-[560px]:border-0 max-[560px]:pl-0">
+              <dt className="order-2 text-[13px] text-bandtext2">
+                {stats.streak > 1 ? "Jours de suite" : "Jour de suite"}
+              </dt>
+              <dd
+                className="m-0 text-[30px] font-bold leading-tight tabular-nums"
+                style={{ letterSpacing: "-0.03em" }}
+              >
+                {stats.streak}
+              </dd>
+            </div>
+            <div className="min-w-[110px] border-l border-bandline pl-10 max-[560px]:border-0 max-[560px]:pl-0">
+              <dt className="order-2 text-[13px] text-bandtext2">
+                Cette semaine
+              </dt>
+              <dd
+                className="m-0 text-[30px] font-bold leading-tight tabular-nums"
+                style={{ letterSpacing: "-0.03em" }}
+              >
+                {stats.week >= 3600
+                  ? `${Math.round(stats.week / 3600)}h`
+                  : formatShortDuration(stats.week)}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+
+      {/* ---- Paper canvas ---- */}
+      <main className="mx-auto max-w-[1020px] px-7">
         <div
-          className="wl-hero mb-8 grid grid-cols-[1.4fr_1fr] gap-3.5 max-[720px]:grid-cols-1 animate-wl-rise"
-          style={{ animationDelay: ".04s" }}
+          className="wl-hero -mt-6 mb-9 grid grid-cols-[1.4fr_1fr] gap-4 max-[720px]:grid-cols-1 animate-wl-rise"
+          style={{ animationDelay: ".05s" }}
         >
-          <div className="rounded-[16px] border border-hairline bg-surface p-6 shadow-sm">
+          <div className="rounded-[16px] border border-hairline bg-surface p-6 shadow-md">
             <form onSubmit={createRoom}>
               <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
                 Nouvelle room
@@ -294,7 +341,8 @@ export default function HomePage() {
                 </div>
                 <button
                   type="submit"
-                  className="wl-lift mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-accent px-5 py-[11px] text-sm font-bold text-ink shadow-sm"
+                  className="wl-lift mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-accentink px-5 py-[11px] text-sm font-bold shadow-sm"
+                  style={{ color: "#fffefb" }}
                 >
                   <Padlock size={15} locked />
                   Lock in
@@ -303,7 +351,7 @@ export default function HomePage() {
             </form>
           </div>
 
-          <div className="flex flex-col rounded-[16px] border border-hairline bg-card p-6 shadow-xs">
+          <div className="flex flex-col rounded-[16px] border border-hairline bg-card p-6 shadow-sm">
             <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
               Rejoindre
             </div>
@@ -363,49 +411,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div
-          className="wl-stats mb-9 grid grid-cols-3 gap-3.5 max-[560px]:grid-cols-1 animate-wl-rise"
-          style={{ animationDelay: ".08s" }}
-        >
-          <div className="rounded-[14px] border border-hairline bg-card px-5 py-[18px] shadow-xs">
-            <div
-              className="text-2xl font-bold text-ink tabular-nums"
-              style={{ letterSpacing: "-0.02em" }}
-            >
-              {formatShortDuration(stats.today)}
-            </div>
-            <div className="mt-1 text-[13px] text-text3">
-              Focus aujourd&apos;hui
-            </div>
-          </div>
-          <div className="rounded-[14px] border border-hairline bg-card px-5 py-[18px] shadow-xs">
-            <div
-              className="text-2xl font-bold text-ink tabular-nums"
-              style={{ letterSpacing: "-0.02em" }}
-            >
-              {stats.streak}
-            </div>
-            <div className="mt-1 text-[13px] text-text3">
-              {stats.streak > 1 ? "Jours de suite" : "Jour de suite"}
-            </div>
-          </div>
-          <div className="rounded-[14px] border border-hairline bg-card px-5 py-[18px] shadow-xs">
-            <div
-              className="text-2xl font-bold text-ink tabular-nums"
-              style={{ letterSpacing: "-0.02em" }}
-            >
-              {stats.week >= 3600
-                ? `${Math.round(stats.week / 3600)}h`
-                : formatShortDuration(stats.week)}
-            </div>
-            <div className="mt-1 text-[13px] text-text3">Cette semaine</div>
-          </div>
-        </div>
-
-        <div
-          className="animate-wl-rise"
-          style={{ animationDelay: ".12s" }}
-        >
+        <div className="animate-wl-rise" style={{ animationDelay: ".1s" }}>
           <div className="mb-3.5 flex items-center justify-between">
             <h2
               className="text-base font-bold text-ink"
@@ -469,7 +475,7 @@ export default function HomePage() {
                               size={30}
                               rounded="50%"
                               fontSize={11}
-                              ringColor="#fffefb"
+                              ringColor="var(--wl-surface)"
                             />
                           </span>
                         ))}
@@ -481,7 +487,7 @@ export default function HomePage() {
                         onClick={() =>
                           router.push(`/room/${encodeURIComponent(r.id)}`)
                         }
-                        className="rounded-full border border-strong bg-surface px-4 py-2 text-[13px] font-semibold text-ink transition-colors duration-150 hover:bg-ink hover:text-surface"
+                        className="rounded-full border border-strong bg-surface px-4 py-2 text-[13px] font-semibold text-ink transition-colors duration-200 ease-wl hover:bg-ink hover:text-surface"
                       >
                         Rejoindre
                       </button>
