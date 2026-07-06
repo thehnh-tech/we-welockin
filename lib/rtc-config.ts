@@ -52,24 +52,24 @@ export function buildPeerOptions(): PeerJSOption {
   return options;
 }
 
-// Human-friendly French messages for fatal PeerJS error types — charter voice:
-// second person, no technical jargon (details stay in console.error). Transient
-// types (e.g. "peer-unavailable" when someone just left) return null = no banner.
+// Human-friendly messages for fatal PeerJS error types — charter voice: second
+// person, no technical jargon (details stay in console.error). Transient types
+// (e.g. "peer-unavailable" when someone just left) return null = no banner.
 export function peerErrorMessage(type: string | undefined): string | null {
   switch (type) {
     case "browser-incompatible":
-      return "Ton navigateur est trop ancien pour les appels vidéo. Mets-le à jour et réessaie.";
+      return "Your browser is too old for video calls. Update it and try again.";
     case "network":
     case "socket-error":
     case "socket-closed":
-      return "Connexion perdue. On réessaie…";
+      return "Connection lost. Retrying…";
     case "server-error":
     case "ssl-unavailable":
-      return "Le service est momentanément indisponible. Réessaie dans un instant.";
+      return "The service is briefly unavailable. Try again in a moment.";
     case "unavailable-id":
-      return "Petit souci de connexion. Recharge la page.";
+      return "Connection hiccup. Reload the page.";
     case "webrtc":
-      return "La connexion vidéo a échoué. Vérifie ta connexion internet.";
+      return "The video connection failed. Check your internet.";
     default:
       return null;
   }

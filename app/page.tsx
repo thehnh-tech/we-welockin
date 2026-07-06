@@ -24,15 +24,18 @@ type RoomView = {
   peerNames: string[];
 };
 
-const DAYS_FR = [
-  "Dimanche",
-  "Lundi",
-  "Mardi",
-  "Mercredi",
-  "Jeudi",
-  "Vendredi",
-  "Samedi",
+const DAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
 ];
+
+const DURATION_PRESETS = [25, 50, 90]; // minutes
+const MAX_MINUTES = 480;
 
 function isoWeek(d: Date): number {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -50,7 +53,8 @@ export default function HomePage() {
   const [rooms, setRooms] = useState<RoomView[]>([]);
   const [newName, setNewName] = useState("");
   const [newSubject, setNewSubject] = useState("");
-  const [newMinutes, setNewMinutes] = useState(25);
+  const [presetMinutes, setPresetMinutes] = useState<number | "custom">(25);
+  const [customMinutes, setCustomMinutes] = useState("45");
   const [codeInput, setCodeInput] = useState("");
   const [codeError, setCodeError] = useState(false);
   const [stats, setStats] = useState({ today: 0, week: 0, streak: 0 });
@@ -60,7 +64,7 @@ export default function HomePage() {
   useEffect(() => {
     setPseudoState(getPseudo());
     const d = new Date();
-    setGreeting(`${DAYS_FR[d.getDay()]} · semaine ${isoWeek(d)}`);
+    setGreeting(`${DAYS[d.getDay()]} · Week ${isoWeek(d)}`);
     setStats({
       today: getTodaySeconds(),
       week: getWeekSeconds(),
@@ -98,6 +102,15 @@ export default function HomePage() {
     [rooms]
   );
 
+  // Resolved timer length in minutes, clamped in JS — no native validation
+  // bubbles ("value must be less than or equal to…").
+  const resolvedMinutes = useMemo(() => {
+    if (presetMinutes !== "custom") return presetMinutes;
+    const n = parseInt(customMinutes, 10);
+    if (!Number.isFinite(n) || n < 1) return 25;
+    return Math.min(MAX_MINUTES, n);
+  }, [presetMinutes, customMinutes]);
+
   const submitPseudo = (e: React.FormEvent) => {
     e.preventDefault();
     const v = pseudoInput.trim();
@@ -110,10 +123,7 @@ export default function HomePage() {
     e.preventDefault();
     const id = generateRoomId();
     const name = newName.trim() || "Study session";
-    // Guard against an empty/NaN minutes field (would propagate ?d=NaN).
-    const minutes =
-      Number.isFinite(newMinutes) && newMinutes > 0 ? Math.floor(newMinutes) : 25;
-    const durationSec = Math.max(60, Math.min(8 * 3600, minutes * 60));
+    const durationSec = Math.max(60, Math.min(8 * 3600, resolvedMinutes * 60));
     const startedAt = Date.now();
     router.push(
       buildRoomUrl({
@@ -155,19 +165,19 @@ export default function HomePage() {
               className="text-2xl font-bold text-ink"
               style={{ letterSpacing: "-0.02em" }}
             >
-              Hey, prêt à lock in ?
+              Hey, ready to lock in?
             </h1>
             <p className="mt-1 text-sm text-text2">
-              Choisis un pseudo pour rejoindre ton crew.
+              Pick a name to join your crew.
             </p>
           </div>
           <input
             autoFocus
             value={pseudoInput}
             onChange={(e) => setPseudoInput(e.target.value)}
-            placeholder="Ton pseudo"
+            placeholder="Your name"
             maxLength={30}
-            aria-label="Pseudo"
+            aria-label="Your name"
             className="w-full rounded-[11px] border border-strong bg-surface px-3.5 py-2.5 text-ink outline-none transition-colors duration-150 focus:border-accentink"
           />
           <button
@@ -198,7 +208,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2.5">
             <div
               className="flex items-center gap-[7px] rounded-full border border-bandline bg-bandchip px-3 py-[7px] text-bandtext2"
-              title="Jours de focus consécutifs"
+              title="Consecutive days of focus"
             >
               <svg
                 width="14"
@@ -216,9 +226,7 @@ export default function HomePage() {
               <span className="text-[13px] font-bold text-bandtext tabular-nums">
                 {stats.streak}
               </span>
-              <span className="text-xs font-medium">
-                {stats.streak > 1 ? "jours de suite" : "jour de suite"}
-              </span>
+              <span className="text-xs font-medium">day streak</span>
             </div>
             <SettingsMenu
               pseudo={pseudo}
@@ -240,20 +248,24 @@ export default function HomePage() {
           </div>
           <h1
             className="mb-2 font-bold"
-            style={{ fontSize: "clamp(30px, 5vw, 46px)", letterSpacing: "-0.03em", lineHeight: 1.05 }}
+            style={{
+              fontSize: "clamp(30px, 5vw, 46px)",
+              letterSpacing: "-0.03em",
+              lineHeight: 1.05,
+            }}
           >
             Hey {pseudo},
             <br />
             <span className="text-accent">lock in.</span>
           </h1>
           <p className="mb-8 text-[15px] text-bandtext2">
-            Lance une room ou rejoins un crew qui étudie déjà.
+            Start a room or join a crew already studying.
           </p>
 
           <dl className="flex flex-wrap gap-x-10 gap-y-4">
             <div className="min-w-[110px]">
               <dt className="order-2 text-[13px] text-bandtext2">
-                Focus aujourd&apos;hui
+                Focused today
               </dt>
               <dd
                 className="m-0 text-[30px] font-bold leading-tight tabular-nums"
@@ -263,9 +275,7 @@ export default function HomePage() {
               </dd>
             </div>
             <div className="min-w-[110px] border-l border-bandline pl-10 max-[560px]:border-0 max-[560px]:pl-0">
-              <dt className="order-2 text-[13px] text-bandtext2">
-                {stats.streak > 1 ? "Jours de suite" : "Jour de suite"}
-              </dt>
+              <dt className="order-2 text-[13px] text-bandtext2">Day streak</dt>
               <dd
                 className="m-0 text-[30px] font-bold leading-tight tabular-nums"
                 style={{ letterSpacing: "-0.03em" }}
@@ -274,9 +284,7 @@ export default function HomePage() {
               </dd>
             </div>
             <div className="min-w-[110px] border-l border-bandline pl-10 max-[560px]:border-0 max-[560px]:pl-0">
-              <dt className="order-2 text-[13px] text-bandtext2">
-                Cette semaine
-              </dt>
+              <dt className="order-2 text-[13px] text-bandtext2">This week</dt>
               <dd
                 className="m-0 text-[30px] font-bold leading-tight tabular-nums"
                 style={{ letterSpacing: "-0.03em" }}
@@ -299,53 +307,99 @@ export default function HomePage() {
           <div className="rounded-[16px] border border-hairline bg-surface p-6 shadow-md">
             <form onSubmit={createRoom}>
               <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
-                Nouvelle room
+                New room
               </div>
               <div
                 className="mb-4 text-[21px] font-bold text-ink"
                 style={{ letterSpacing: "-0.02em" }}
               >
-                Lance une focus room
+                Start a focus room
               </div>
               <div className="flex flex-col gap-2.5">
                 <input
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Nom (ex : Révisions orga chimie)"
+                  placeholder="Name (e.g. Organic chem finals)"
                   maxLength={60}
-                  aria-label="Nom de la room"
+                  aria-label="Room name"
                   className="w-full rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accentink"
                 />
-                <div className="flex gap-2.5 max-[560px]:flex-col">
-                  <input
-                    value={newSubject}
-                    onChange={(e) => setNewSubject(e.target.value)}
-                    placeholder="Sujet (optionnel)"
-                    maxLength={60}
-                    aria-label="Sujet"
-                    className="min-w-0 flex-1 rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accentink"
-                  />
-                  <div className="flex items-center gap-2 rounded-[11px] border border-strong bg-surface px-3 py-2.5">
-                    <span className="text-sm text-text3">Timer</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={480}
-                      value={newMinutes}
-                      onChange={(e) => setNewMinutes(Number(e.target.value))}
-                      aria-label="Durée du timer en minutes"
-                      className="w-16 bg-transparent text-right text-sm text-ink outline-none tabular-nums"
-                    />
-                    <span className="text-sm text-text3">min</span>
-                  </div>
+                <input
+                  value={newSubject}
+                  onChange={(e) => setNewSubject(e.target.value)}
+                  placeholder="Subject (optional)"
+                  maxLength={60}
+                  aria-label="Subject"
+                  className="w-full rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accentink"
+                />
+
+                {/* Timer length — selection pills (charter pattern), no native
+                    number-input validation bubbles. */}
+                <div
+                  className="flex flex-wrap items-center gap-1.5"
+                  role="radiogroup"
+                  aria-label="Timer length"
+                >
+                  {DURATION_PRESETS.map((m) => {
+                    const selected = presetMinutes === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setPresetMinutes(m)}
+                        className={`rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-colors duration-200 ease-wl ${
+                          selected
+                            ? "border-transparent bg-ink text-surface shadow-xs"
+                            : "border-strong bg-surface text-text2 hover:text-ink"
+                        }`}
+                      >
+                        {m >= 60
+                          ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}`
+                          : `${m} min`}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={presetMinutes === "custom"}
+                    onClick={() => setPresetMinutes("custom")}
+                    className={`rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-colors duration-200 ease-wl ${
+                      presetMinutes === "custom"
+                        ? "border-transparent bg-ink text-surface shadow-xs"
+                        : "border-strong bg-surface text-text2 hover:text-ink"
+                    }`}
+                  >
+                    Custom
+                  </button>
+                  {presetMinutes === "custom" && (
+                    <span className="flex items-center gap-1.5 rounded-full border border-strong bg-surface py-1.5 pl-3 pr-3.5 animate-wl-rise">
+                      <input
+                        value={customMinutes}
+                        onChange={(e) =>
+                          setCustomMinutes(
+                            e.target.value.replace(/[^0-9]/g, "").slice(0, 3)
+                          )
+                        }
+                        inputMode="numeric"
+                        aria-label="Custom length in minutes (1 to 480)"
+                        className="w-10 bg-transparent text-right text-[13px] font-semibold text-ink outline-none tabular-nums"
+                        autoFocus
+                      />
+                      <span className="text-[13px] text-text3">min</span>
+                    </span>
+                  )}
                 </div>
+
                 <button
                   type="submit"
                   className="wl-lift mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-accentink px-5 py-[11px] text-sm font-bold shadow-sm"
                   style={{ color: "#fffefb" }}
                 >
                   <Padlock size={15} locked />
-                  Lock in
+                  Lock in · {resolvedMinutes} min
                 </button>
               </div>
             </form>
@@ -353,13 +407,13 @@ export default function HomePage() {
 
           <div className="flex flex-col rounded-[16px] border border-hairline bg-card p-6 shadow-sm">
             <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
-              Rejoindre
+              Join
             </div>
             <div
               className="mb-4 text-[21px] font-bold text-ink"
               style={{ letterSpacing: "-0.02em" }}
             >
-              Tu as un code ?
+              Got a code?
             </div>
             <form onSubmit={joinByCode} className="mt-auto">
               <div className="flex gap-2">
@@ -369,9 +423,9 @@ export default function HomePage() {
                     setCodeInput(e.target.value);
                     setCodeError(false);
                   }}
-                  placeholder="FOCUS-00000"
+                  placeholder="FOCUS-XXXXX"
                   maxLength={20}
-                  aria-label="Code de la room"
+                  aria-label="Room code"
                   aria-invalid={codeError}
                   className={`min-w-0 flex-1 rounded-[11px] border bg-surface px-3 py-2.5 text-sm font-semibold uppercase tracking-wider text-ink outline-none transition-colors duration-150 focus:border-accentink ${
                     codeError ? "border-danger" : "border-strong"
@@ -379,7 +433,7 @@ export default function HomePage() {
                 />
                 <button
                   type="submit"
-                  aria-label="Rejoindre avec le code"
+                  aria-label="Join with code"
                   disabled={!codeInput.trim()}
                   className={`wl-lift flex w-[42px] min-w-[42px] items-center justify-center rounded-[11px] border ${
                     codeInput.trim()
@@ -404,7 +458,7 @@ export default function HomePage() {
               </div>
               {codeError && (
                 <p className="mt-2 text-xs font-medium text-danger" role="alert">
-                  Ce code ne ressemble pas à un code de room.
+                  That doesn&apos;t look like a room code.
                 </p>
               )}
             </form>
@@ -417,7 +471,7 @@ export default function HomePage() {
               className="text-base font-bold text-ink"
               style={{ letterSpacing: "-0.02em" }}
             >
-              Rooms en direct
+              Live rooms
             </h2>
             <span className="flex items-center gap-1.5 text-xs font-semibold text-text2">
               <span
@@ -425,13 +479,13 @@ export default function HomePage() {
                 style={{ background: "#54a078" }}
                 aria-hidden="true"
               />
-              {liveCount} en train d&apos;étudier
+              {liveCount} studying now
             </span>
           </div>
 
           {rooms.length === 0 ? (
             <div className="rounded-[14px] border border-hairline bg-card px-5 py-8 text-center text-sm text-text3">
-              Aucune room active pour l&apos;instant. Lance la tienne.
+              No live rooms right now. Start yours.
             </div>
           ) : (
             <ul className="flex list-none flex-col gap-2.5 p-0">
@@ -457,7 +511,7 @@ export default function HomePage() {
                         <span className="rounded-full bg-sunken px-2 py-0.5 text-xs font-semibold text-text2 tabular-nums">
                           {remaining > 0
                             ? `Focus ${formatClock(remaining)}`
-                            : "Terminé"}
+                            : "Done"}
                         </span>
                         {r.subject && (
                           <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-text3">
@@ -489,7 +543,7 @@ export default function HomePage() {
                         }
                         className="rounded-full border border-strong bg-surface px-4 py-2 text-[13px] font-semibold text-ink transition-colors duration-200 ease-wl hover:bg-ink hover:text-surface"
                       >
-                        Rejoindre
+                        Join
                       </button>
                     </div>
                   </li>

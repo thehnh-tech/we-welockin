@@ -10,7 +10,6 @@ import {
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getPseudo } from "@/lib/cookies";
 import { displayRoomCode } from "@/lib/roomCode";
-import { formatShortDuration } from "@/lib/time";
 import { usePrefs } from "@/lib/prefs";
 import VideoTile from "@/components/VideoTile";
 import Timer from "@/components/Timer";
@@ -210,7 +209,6 @@ function RoomInner() {
     const m = new Map(roster.map((p) => [p.peerId, p]));
     return m;
   }, [roster]);
-  const selfEntry = myPeerId ? rosterById.get(myPeerId) : undefined;
   const remotesList = useMemo(() => Array.from(remotes.entries()), [remotes]);
 
   if (roomError) {
@@ -222,7 +220,7 @@ function RoomInner() {
             onClick={() => router.push("/")}
             className="wl-lift rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface"
           >
-            Retour à l&apos;accueil
+            Back home
           </button>
         </div>
       </main>
@@ -239,13 +237,13 @@ function RoomInner() {
               onClick={() => window.location.reload()}
               className="wl-lift rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface"
             >
-              Réessayer
+              Try again
             </button>
             <button
               onClick={() => router.push("/")}
               className="wl-lift rounded-full border border-strong bg-surface px-5 py-2.5 text-sm font-semibold text-ink2"
             >
-              Accueil
+              Home
             </button>
           </div>
         </div>
@@ -282,7 +280,7 @@ function RoomInner() {
                 setCollapsed(false);
                 setMobOpen(true);
               }}
-              aria-label="Ouvrir le panneau des participants"
+              aria-label="Open crew panel"
             >
               <svg
                 width="18"
@@ -314,8 +312,8 @@ function RoomInner() {
               </span>
               <button
                 onClick={copyLink}
-                aria-label="Copier le lien d'invitation"
-                title="Copier le lien d'invitation"
+                aria-label="Copy invite link"
+                title="Copy invite link"
                 className="flex h-7 w-7 items-center justify-center rounded-[8px] text-bandtext2 transition-colors duration-150 hover:bg-bandchip hover:text-bandtext"
               >
                 {copied ? (
@@ -363,7 +361,7 @@ function RoomInner() {
             <span>{banner}</span>
             <button
               onClick={dismissWarning}
-              aria-label="Masquer l'avertissement"
+              aria-label="Dismiss warning"
               className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-sunken"
             >
               <svg
@@ -396,8 +394,8 @@ function RoomInner() {
           )}
           <div className="mt-3 text-[13.5px] text-text2">
             {deep
-              ? "Deep Focus — tout est silencieux, ton micro est coupé"
-              : "Lock in — reste concentré jusqu'à la fin du timer"}
+              ? "Deep Focus — everyone's muted, including you"
+              : "Locked in — stay until the timer ends"}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
@@ -407,29 +405,29 @@ function RoomInner() {
               pressed={effectiveMuted}
               label={
                 deep
-                  ? "Micro coupé par le Deep Focus"
+                  ? "Mic muted by Deep Focus"
                   : muted
-                    ? "Réactiver le micro"
-                    : "Couper le micro"
+                    ? "Unmute"
+                    : "Mute"
               }
             >
               <MicIcon off={effectiveMuted} />
-              {deep ? "Micro coupé" : muted ? "Réactiver" : "Micro"}
+              {deep ? "Mic off" : muted ? "Unmute" : "Mic"}
             </ControlPill>
 
             <ControlPill
               onClick={toggleCam}
               pressed={camOff}
-              label={camOff ? "Réactiver la caméra" : "Couper la caméra"}
+              label={camOff ? "Turn camera on" : "Turn camera off"}
             >
               <CamIcon off={camOff} />
-              {camOff ? "Caméra coupée" : "Caméra"}
+              {camOff ? "Camera off" : "Camera"}
             </ControlPill>
 
             <ControlPill
               onClick={() => setDeep((d) => !d)}
               pressed={deep}
-              label={deep ? "Quitter le Deep Focus" : "Activer le Deep Focus"}
+              label={deep ? "Exit Deep Focus" : "Enter Deep Focus"}
             >
               <svg
                 width="14"
@@ -445,13 +443,13 @@ function RoomInner() {
                 <path d="M3 18v-6a9 9 0 0118 0v6" />
                 <path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
               </svg>
-              {deep ? "Quitter le Deep Focus" : "Deep Focus"}
+              {deep ? "Exit Deep Focus" : "Deep Focus"}
             </ControlPill>
 
             <ControlPill
               onClick={toggleFocus}
               pressed={focusMode}
-              label={focusMode ? "Quitter le mode focus" : "Passer en mode focus"}
+              label={focusMode ? "Exit focus mode" : "Enter focus mode"}
             >
               <svg
                 width="14"
@@ -470,18 +468,18 @@ function RoomInner() {
                   <path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3" />
                 )}
               </svg>
-              {focusMode ? "Quitter le mode focus" : "Mode focus"}
+              {focusMode ? "Exit focus" : "Focus mode"}
             </ControlPill>
           </div>
 
           <div className="sr-only" aria-live="polite">
             {connected
-              ? `Connecté, ${roster.length} participant${roster.length > 1 ? "s" : ""}`
-              : "Connexion en cours"}
+              ? `Connected, ${roster.length} participant${roster.length > 1 ? "s" : ""}`
+              : "Connecting"}
           </div>
           {/* Screen-reader feedback for the icon-only copy button. */}
           <span className="sr-only" role="status" aria-live="polite">
-            {copied ? "Lien d'invitation copié" : ""}
+            {copied ? "Invite link copied" : ""}
           </span>
         </section>
 
@@ -490,7 +488,7 @@ function RoomInner() {
         >
           <VideoTile
             stream={localStream}
-            username={pseudo ?? "Toi"}
+            username={pseudo ?? "You"}
             tintKey={prefs.tint}
             muted
             mirrored
@@ -499,11 +497,6 @@ function RoomInner() {
             speaking={speaking.has("self") && !effectiveMuted}
             micOff={effectiveMuted}
             deepBadge={deep}
-            focusTime={
-              selfEntry
-                ? formatShortDuration((now - selfEntry.joinedAt) / 1000)
-                : undefined
-            }
           />
           {remotesList.map(([peerId, info]) => {
             const entry = rosterById.get(peerId);
@@ -520,11 +513,6 @@ function RoomInner() {
                 speaking={speaking.has(peerId) && !remoteMicOff && !deep}
                 micOff={remoteMicOff}
                 dimmed={!!st?.away}
-                focusTime={
-                  entry
-                    ? formatShortDuration((now - entry.joinedAt) / 1000)
-                    : undefined
-                }
               />
             );
           })}

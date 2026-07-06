@@ -41,7 +41,7 @@ export function useRoomMeta(
         if (!res.ok) {
           if (alive)
             setRoomError(
-              "Room introuvable. Vérifie le code, ou demande un nouveau lien à l'organisateur."
+              "This room doesn't exist. Check the code, or ask the host for a fresh link."
             );
           return;
         }
@@ -55,7 +55,7 @@ export function useRoomMeta(
           });
         }
       } catch {
-        if (alive) setRoomError("Erreur réseau.");
+        if (alive) setRoomError("Network error.");
       }
     })();
     return () => {

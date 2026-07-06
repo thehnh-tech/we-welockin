@@ -86,7 +86,11 @@ export function applyVisualPrefs(p: Prefs, animate = false): void {
       el.dataset.wlAccent = p.accent;
       el.classList.toggle("wl-reduce", p.reducedMotion);
       void el.offsetHeight; // flush styles with transitions off
-      requestAnimationFrame(() => el.classList.remove("wl-notransition"));
+      // rAF never fires in a hidden tab — keep a timeout fallback so the
+      // class can't get stuck (removal is idempotent).
+      const done = () => el.classList.remove("wl-notransition");
+      requestAnimationFrame(done);
+      setTimeout(done, 150);
     };
     const vt = (
       document as Document & {

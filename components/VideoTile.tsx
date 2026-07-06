@@ -14,7 +14,6 @@ type Props = {
   micOff?: boolean;
   deepBadge?: boolean;
   dimmed?: boolean; // away
-  focusTime?: string;
   compact?: boolean; // focus-mode grid
 };
 
@@ -29,7 +28,6 @@ export default function VideoTile({
   micOff = false,
   deepBadge = false,
   dimmed = false,
-  focusTime,
   compact = false,
 }: Props) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -132,7 +130,7 @@ export default function VideoTile({
       {showEq ? (
         <div
           className="absolute right-3 top-3 flex h-[18px] items-end gap-[2px] rounded-full bg-accenttint px-[8px] py-[5px]"
-          aria-label={`${username} parle`}
+          aria-label={`${username} is speaking`}
           role="img"
         >
           <span className="w-[3px] rounded-sm bg-accentink animate-wl-eq" />
@@ -149,7 +147,7 @@ export default function VideoTile({
         <div
           className="absolute right-3 top-3 flex h-[26px] w-[26px] items-center justify-center rounded-[8px]"
           style={{ background: "rgba(26,23,20,.55)" }}
-          aria-label={`${username} : micro coupé`}
+          aria-label={`${username}: mic off`}
           role="img"
         >
           <svg
@@ -169,7 +167,7 @@ export default function VideoTile({
         </div>
       ) : null}
 
-      {/* Bottom: name pill + focus time — ink overlays for contrast on video. */}
+      {/* Bottom: name pill — ink overlay for contrast on video. */}
       <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-end justify-between gap-2">
         <span
           className={`max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full px-2.5 py-1 font-semibold ${
@@ -178,16 +176,8 @@ export default function VideoTile({
           style={{ background: "rgba(26,23,20,.72)", color: "#fffefb" }}
         >
           {username}
-          {isLocal && " (toi)"}
+          {isLocal && " (you)"}
         </span>
-        {focusTime && !compact && (
-          <span
-            className="whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-semibold tabular-nums"
-            style={{ background: "rgba(26,23,20,.55)", color: "#fffefb" }}
-          >
-            {focusTime}
-          </span>
-        )}
       </div>
     </div>
   );

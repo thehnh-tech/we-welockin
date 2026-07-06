@@ -85,8 +85,8 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
       Notification.permission === "granted"
     ) {
       try {
-        new Notification("Session terminée", {
-          body: "Le timer est arrivé à zéro. Bien joué.",
+        new Notification("Session over", {
+          body: "The timer hit zero. Nice work.",
         });
       } catch {}
     }
@@ -111,18 +111,18 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
     };
 
     if (reduceMotion) {
-      document.title = "Session terminée — welock.in";
+      document.title = "Session over — welock.in";
     } else {
       // Bounded flash (~5 cycles) then a static title.
       let on = false;
       let cycles = 0;
       titleTimer = setInterval(() => {
-        document.title = on ? original : "Session terminée — welock.in";
+        document.title = on ? original : "Session over — welock.in";
         on = !on;
         if (++cycles >= 10) {
           if (titleTimer) clearInterval(titleTimer);
           titleTimer = null;
-          document.title = "Session terminée — welock.in";
+          document.title = "Session over — welock.in";
         }
       }, 1000);
     }
@@ -146,63 +146,49 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
       ? formatClock(remainingSec)
       : `${Math.ceil(remainingSec / 60)} min`;
 
-  const minimal = prefs.timerStyle === "minimal";
-  const ringPx = big ? 300 : 190;
-  const strokeW = big ? 11 : 8;
-  const r = ringPx / 2 - strokeW - 2;
-  const mid = ringPx / 2;
-  const circumference = 2 * Math.PI * r;
-  const color = finished ? "var(--wl-ink)" : "var(--wl-accent)";
+  const ariaLabel = finished
+    ? "Session over"
+    : `Time left: ${formatClock(remainingSec)}`;
 
-  const eyebrow = (
+  const label = (
     <span
-      className="mb-1 flex items-center gap-1.5 font-semibold uppercase text-text2"
-      style={{ fontSize: 11, letterSpacing: ".06em" }}
+      className="mt-2 font-semibold uppercase text-text3"
+      style={{ fontSize: big ? 12 : 11, letterSpacing: ".14em" }}
     >
-      {!finished && (
-        <span
-          className="h-1.5 w-1.5 rounded-full animate-wl-live"
-          style={{ background: "var(--wl-accent)" }}
-        />
-      )}
-      {finished ? "Terminé" : "Focus"}
+      {finished ? "Done" : "Focus"}
     </span>
   );
 
   const srStatus = (
     <span className="sr-only" role="status" aria-live="polite">
-      {finished ? "Session terminée" : ""}
+      {finished ? "Session over" : ""}
     </span>
   );
 
-  if (minimal) {
+  if (prefs.timerStyle === "minimal") {
     return (
       <div
-        className="flex flex-col items-center justify-center py-6"
+        className="flex flex-col items-center justify-center py-8"
         role="timer"
-        aria-label={
-          finished
-            ? "Session terminée"
-            : `Temps restant : ${formatClock(remainingSec)}`
-        }
+        aria-label={ariaLabel}
       >
         <div aria-hidden="true" className="flex flex-col items-center">
-          {eyebrow}
           <span
             className="font-bold leading-none text-ink tabular-nums"
-            style={{ fontSize: big ? 96 : 64, letterSpacing: "-0.03em" }}
+            style={{ fontSize: big ? 110 : 88, letterSpacing: "-0.04em" }}
           >
             {display}
           </span>
+          {label}
           <span
-            className="mt-5 block h-[3px] w-44 overflow-hidden rounded-full"
+            className="mt-6 block h-[3px] w-56 overflow-hidden rounded-full"
             style={{ background: "var(--wl-track)" }}
           >
             <span
               className="block h-full rounded-full"
               style={{
                 width: `${progress * 100}%`,
-                background: color,
+                background: finished ? "var(--wl-ink)" : "var(--wl-accent)",
                 transition: "width .5s linear, background-color .3s",
               }}
             />
@@ -213,17 +199,20 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
     );
   }
 
+  const ringPx = big ? 340 : 260;
+  const strokeW = 7;
+  const r = ringPx / 2 - strokeW - 2;
+  const mid = ringPx / 2;
+  const circumference = 2 * Math.PI * r;
+  const color = finished ? "var(--wl-ink)" : "var(--wl-accent)";
+
   return (
     <div className="flex flex-col items-center justify-center">
       <div
         className="relative transition-all duration-300 ease-wl"
         style={{ width: ringPx, height: ringPx }}
         role="timer"
-        aria-label={
-          finished
-            ? "Session terminée"
-            : `Temps restant : ${formatClock(remainingSec)}`
-        }
+        aria-label={ariaLabel}
       >
         <svg
           className="relative -rotate-90"
@@ -259,16 +248,16 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
           className="absolute inset-0 flex flex-col items-center justify-center"
           aria-hidden="true"
         >
-          {eyebrow}
           <span
             className="font-bold leading-none text-ink tabular-nums"
             style={{
-              fontSize: big ? 68 : showSeconds ? 44 : 40,
-              letterSpacing: "-0.03em",
+              fontSize: big ? 76 : showSeconds ? 56 : 50,
+              letterSpacing: "-0.04em",
             }}
           >
             {display}
           </span>
+          {label}
         </div>
       </div>
       {srStatus}

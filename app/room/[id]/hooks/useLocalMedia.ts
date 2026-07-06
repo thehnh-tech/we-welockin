@@ -31,12 +31,12 @@ export function useLocalMedia(enabled: boolean): {
           const name = e instanceof DOMException ? e.name : "";
           setMediaError(
             name === "NotAllowedError" || name === "SecurityError"
-              ? "Permission refusée. Autorise la caméra et le micro."
+              ? "Permission denied. Allow camera and microphone access."
               : name === "NotFoundError" || name === "DevicesNotFoundError"
-                ? "Aucune caméra/micro détecté."
+                ? "No camera or microphone found."
                 : name === "NotReadableError"
-                  ? "Caméra/micro déjà utilisé par une autre application."
-                  : "Impossible d'accéder à la caméra/micro."
+                  ? "Your camera or mic is in use by another app."
+                  : "Couldn't access your camera or mic."
           );
         }
         return;
