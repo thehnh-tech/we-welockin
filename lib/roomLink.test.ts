@@ -3,7 +3,13 @@ import { buildRoomUrl, parseRoomParams } from "./roomLink";
 
 function paramsOf(url: string) {
   const qs = new URLSearchParams(url.split("?")[1] ?? "");
-  return { n: qs.get("n"), d: qs.get("d"), s: qs.get("s"), sub: qs.get("sub") };
+  return {
+    n: qs.get("n"),
+    d: qs.get("d"),
+    s: qs.get("s"),
+    sub: qs.get("sub"),
+    p: qs.get("p"),
+  };
 }
 
 describe("roomLink", () => {
@@ -24,6 +30,7 @@ describe("roomLink", () => {
       durationSec: 1500,
       startedAt: 1782573741066,
       subject: "Chapitre 4",
+      visibility: "public",
     });
   });
 
@@ -81,5 +88,23 @@ describe("roomLink", () => {
     });
     expect(parsed?.name.length).toBe(60);
     expect(parsed?.subject.length).toBe(60);
+  });
+
+  it("round-trips the private flag", () => {
+    const url = buildRoomUrl({
+      id: "x",
+      name: "N",
+      durationSec: 1500,
+      startedAt: 1,
+      visibility: "private",
+    });
+    expect(url.includes("p=1")).toBe(true);
+    expect(parseRoomParams(paramsOf(url))?.visibility).toBe("private");
+  });
+
+  it("defaults to public when the flag is absent", () => {
+    const url = buildRoomUrl({ id: "x", name: "N", durationSec: 1500, startedAt: 1 });
+    expect(url.includes("p=")).toBe(false);
+    expect(parseRoomParams(paramsOf(url))?.visibility).toBe("public");
   });
 });

@@ -6,6 +6,7 @@ export type RoomMeta = {
   subject: string;
   durationSec: number;
   startedAt: number;
+  visibility: "public" | "private";
 };
 
 // Resolve room metadata: trust the deep-link params first, otherwise ask the
@@ -15,7 +16,8 @@ export function useRoomMeta(
   n: string | null,
   d: string | null,
   s: string | null,
-  sub: string | null
+  sub: string | null,
+  p: string | null
 ): { room: RoomMeta | null; roomError: string | null } {
   const [room, setRoom] = useState<RoomMeta | null>(null);
   const [roomError, setRoomError] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export function useRoomMeta(
     // lookup, never crash the room.
     let fromUrl = null;
     try {
-      fromUrl = parseRoomParams({ n, d, s, sub });
+      fromUrl = parseRoomParams({ n, d, s, sub, p });
     } catch {}
     if (fromUrl) {
       setRoom(fromUrl);
@@ -52,6 +54,8 @@ export function useRoomMeta(
             subject: data.room.subject ?? "",
             durationSec: data.room.durationSec,
             startedAt: data.room.startedAt,
+            visibility:
+              data.room.visibility === "private" ? "private" : "public",
           });
         }
       } catch {
@@ -61,7 +65,7 @@ export function useRoomMeta(
     return () => {
       alive = false;
     };
-  }, [roomId, n, d, s, sub]);
+  }, [roomId, n, d, s, sub, p]);
 
   return { room, roomError };
 }

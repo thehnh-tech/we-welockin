@@ -33,6 +33,10 @@ export function sanitizeSubject(subject: string | undefined): string {
   return (subject ?? "").toString().replace(CONTROL_CHARS, "").trim().slice(0, 60);
 }
 
+export function sanitizeVisibility(v: unknown): "public" | "private" {
+  return v === "private" ? "private" : "public";
+}
+
 const TINT_KEYS = new Set([
   "bleu",
   "rose",

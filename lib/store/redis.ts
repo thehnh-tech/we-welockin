@@ -21,6 +21,7 @@ import {
   sanitizeStatus,
   sanitizeSubject,
   sanitizeUsername,
+  sanitizeVisibility,
 } from "./sanitize";
 
 // Redis schema (prefix wlis:):
@@ -49,6 +50,7 @@ type RawMeta = {
   subject?: unknown;
   durationSec?: unknown;
   startedAt?: unknown;
+  visibility?: unknown;
 };
 
 type PeerEntry = {
@@ -67,6 +69,7 @@ function parseMeta(id: string, raw: RawMeta | null, now: number): RoomMeta | nul
     subject: raw.subject != null ? String(raw.subject) : "",
     durationSec,
     startedAt: Number.isFinite(startedAt) ? startedAt : now,
+    visibility: sanitizeVisibility(raw.visibility),
   };
 }
 
@@ -177,7 +180,8 @@ export const redisBackend: StoreBackend = {
         continue;
       }
       const peers = await readPeers(id, now);
-      if (peers.length > 0) {
+      // Private rooms never show up in discovery — code/link only.
+      if (peers.length > 0 && meta.visibility === "public") {
         out.push(publicView(meta, peers));
       }
     }
@@ -195,8 +199,15 @@ export const redisBackend: StoreBackend = {
       const startedAt = sanitizeStartedAt(input.startedAt, durationSec, now);
       const name = sanitizeName(input.name);
       const subject = sanitizeSubject(input.subject);
-      meta = { id: roomId, name, subject, durationSec, startedAt };
-      await r.hset(metaKey(roomId), { name, subject, durationSec, startedAt });
+      const visibility = sanitizeVisibility(input.visibility);
+      meta = { id: roomId, name, subject, durationSec, startedAt, visibility };
+      await r.hset(metaKey(roomId), {
+        name,
+        subject,
+        durationSec,
+        startedAt,
+        visibility,
+      });
       const roomCount = await r.zcard(INDEX);
       if (roomCount < MAX_ROOMS) {
         await r.zadd(INDEX, { score: startedAt, member: roomId });

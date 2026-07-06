@@ -54,6 +54,7 @@ export default function HomePage() {
   const [newName, setNewName] = useState("");
   const [newSubject, setNewSubject] = useState("");
   const [presetMinutes, setPresetMinutes] = useState<number | "custom">(25);
+  const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [customMinutes, setCustomMinutes] = useState("45");
   const [codeInput, setCodeInput] = useState("");
   const [codeError, setCodeError] = useState(false);
@@ -132,6 +133,7 @@ export default function HomePage() {
         durationSec,
         startedAt,
         subject: newSubject.trim() || undefined,
+        visibility,
       })
     );
   };
@@ -393,6 +395,36 @@ export default function HomePage() {
                   )}
                 </div>
 
+                <div className="flex flex-wrap items-center gap-2">
+                  <div
+                    className="flex gap-1 rounded-full bg-sunken p-1"
+                    role="radiogroup"
+                    aria-label="Room visibility"
+                  >
+                    {(["public", "private"] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        role="radio"
+                        aria-checked={visibility === v}
+                        onClick={() => setVisibility(v)}
+                        className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold capitalize transition-colors duration-200 ease-wl ${
+                          visibility === v
+                            ? "bg-ink text-surface shadow-xs"
+                            : "text-text2 hover:text-ink"
+                        }`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-xs text-text3">
+                    {visibility === "private"
+                      ? "Only people with the code can join."
+                      : "Shows up in Live rooms."}
+                  </span>
+                </div>
+
                 <button
                   type="submit"
                   className="wl-lift mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-accentink px-5 py-[11px] text-sm font-bold shadow-sm"
@@ -405,17 +437,17 @@ export default function HomePage() {
             </form>
           </div>
 
-          <div className="flex flex-col rounded-[16px] border border-hairline bg-card p-6 shadow-sm">
+          <div className="rounded-[16px] border border-hairline bg-card p-6 shadow-sm">
             <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
               Join
             </div>
             <div
-              className="mb-4 text-[21px] font-bold text-ink"
+              className="mb-3 text-[21px] font-bold text-ink"
               style={{ letterSpacing: "-0.02em" }}
             >
               Got a code?
             </div>
-            <form onSubmit={joinByCode} className="mt-auto">
+            <form onSubmit={joinByCode}>
               <div className="flex gap-2">
                 <input
                   value={codeInput}
@@ -456,9 +488,14 @@ export default function HomePage() {
                   </svg>
                 </button>
               </div>
-              {codeError && (
+              {codeError ? (
                 <p className="mt-2 text-xs font-medium text-danger" role="alert">
                   That doesn&apos;t look like a room code.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-text3">
+                  Codes look like FOCUS-ABCDE. Private rooms can only be
+                  joined this way.
                 </p>
               )}
             </form>

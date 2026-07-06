@@ -7,6 +7,7 @@ export type RoomLinkMeta = {
   durationSec: number;
   startedAt: number;
   subject?: string;
+  visibility?: "public" | "private";
 };
 
 export function buildRoomUrl(meta: RoomLinkMeta): string {
@@ -16,6 +17,7 @@ export function buildRoomUrl(meta: RoomLinkMeta): string {
     s: String(meta.startedAt),
   };
   if (meta.subject) params.sub = meta.subject;
+  if (meta.visibility === "private") params.p = "1";
   const qs = new URLSearchParams(params).toString();
   return `/room/${encodeURIComponent(meta.id)}?${qs}`;
 }
@@ -25,6 +27,7 @@ export type ParsedRoomParams = {
   durationSec: number;
   startedAt: number;
   subject: string;
+  visibility: "public" | "private";
 };
 
 // Parse the optional deep-link params. Returns null when absent or invalid, so
@@ -40,6 +43,7 @@ export function parseRoomParams(params: {
   d: string | null;
   s: string | null;
   sub?: string | null;
+  p?: string | null;
 }): ParsedRoomParams | null {
   if (params.n === null || params.d === null || params.s === null) return null;
   const durationSec = parseInt(params.d, 10);
@@ -56,5 +60,6 @@ export function parseRoomParams(params: {
     durationSec,
     startedAt,
     subject: (params.sub ?? "").slice(0, 60),
+    visibility: params.p === "1" ? "private" : "public",
   };
 }

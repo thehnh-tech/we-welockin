@@ -20,6 +20,7 @@ export type RoomMeta = {
   subject: string;
   durationSec: number;
   startedAt: number;
+  visibility: "public" | "private"; // private = joinable by code only, never listed
 };
 
 export type RoomPublic = RoomMeta & {
@@ -36,6 +37,7 @@ export type AnnounceInput = {
   subject?: string;
   durationSec?: number;
   startedAt?: number;
+  visibility?: string;
   status?: Partial<PeerStatus> & { tint?: string };
 };
 

@@ -9,13 +9,14 @@
    color transitions below.
 --------------------------------------------------------------------------- */
 :root {
-  /* Papier (default) — warm paper surfaces, brown inks */
-  --wl-canvas: #efeae0;
-  --wl-surface: #fffefb;
-  --wl-card: #faf7f1;
-  --wl-cardalt: #fcfaf6;
-  --wl-sunken: #f2ede3;
-  --wl-track: #e7e1d6;
+  /* Papier (default) — warm paper surfaces, brown inks. Toned down from the
+     original charter values: less glare, easier on the eyes. */
+  --wl-canvas: #e9e2d4;
+  --wl-surface: #f6f1e6;
+  --wl-card: #f1ebde;
+  --wl-cardalt: #f3eee2;
+  --wl-sunken: #e2dac9;
+  --wl-track: #d6cdba;
 
   --wl-ink: #1a1714;
   --wl-ink2: #3a352d;
@@ -35,15 +36,15 @@
   /* Ink band — sidebar + page top zone (a different world than the canvas) */
   --wl-band: #1a1714;
   --wl-band-2: #241f1a;
-  --wl-band-text: #fffefb;
-  --wl-band-text2: rgba(255, 254, 251, 0.74);
-  --wl-band-text3: rgba(255, 254, 251, 0.52);
-  --wl-band-line: rgba(255, 254, 251, 0.13);
-  --wl-band-chip: rgba(255, 254, 251, 0.08);
-  --wl-band-active: #fffefb;
+  --wl-band-text: #f6f1e6;
+  --wl-band-text2: rgba(246, 241, 230, 0.74);
+  --wl-band-text3: rgba(246, 241, 230, 0.52);
+  --wl-band-line: rgba(246, 241, 230, 0.13);
+  --wl-band-chip: rgba(246, 241, 230, 0.08);
+  --wl-band-active: #f6f1e6;
   --wl-band-active-text: #1a1714;
 
-  --wl-scrollbar: #d6cfc2;
+  --wl-scrollbar: #cbc2b0;
   --wl-shadow-color: 26, 23, 20;
 
   /* Accent (terracotta by default; overridden by [data-wl-accent]) */
@@ -260,17 +261,16 @@ html.wl-reduce *::after {
 }
 
 /* Room sidebar: collapsible on desktop, slide-in drawer on mobile.
-   Smoothness notes: the inner content sits in a fixed-width wrapper
-   (.wl-sideinner) so it gets CLIPPED during the width animation instead of
-   reflowing/wrapping every frame, and `visibility` flips only at the END of
-   the collapse (transition-delay) instead of vanishing instantly. */
+   Smoothness notes: the collapse SLIDES the whole panel out via margin-left
+   (its 252px content never re-lays-out — it moves as one solid block), and
+   `visibility` flips only at the END of the collapse (transition-delay). */
 .wl-sidebar {
   width: 252px;
   min-width: 252px;
   overflow: hidden;
+  will-change: margin-left;
   transition:
-    width 0.38s cubic-bezier(0.2, 0.8, 0.3, 1),
-    min-width 0.38s cubic-bezier(0.2, 0.8, 0.3, 1),
+    margin-left 0.45s cubic-bezier(0.2, 0.8, 0.3, 1),
     visibility 0s linear 0s;
 }
 .wl-sideinner {
@@ -281,15 +281,13 @@ html.wl-reduce *::after {
   flex-direction: column;
 }
 .wl-sidebar.wl-collapsed {
-  width: 0;
-  min-width: 0;
+  margin-left: -252px;
   border-right-color: transparent;
   /* Out of the tab order and the a11y tree once fully closed. */
   visibility: hidden;
   transition:
-    width 0.38s cubic-bezier(0.2, 0.8, 0.3, 1),
-    min-width 0.38s cubic-bezier(0.2, 0.8, 0.3, 1),
-    visibility 0s linear 0.38s;
+    margin-left 0.45s cubic-bezier(0.2, 0.8, 0.3, 1),
+    visibility 0s linear 0.45s;
 }
 .wl-openbtn {
   display: none;
@@ -345,15 +343,17 @@ html.wl-reduce *::after {
   gap: 14px;
   max-width: 1100px;
 }
+/* Focus mode: smaller but still readable tiles (160–220px), centered. */
 .wl-grid.wl-focus {
-  grid-template-columns: repeat(6, 1fr);
-  max-width: 820px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 220px));
+  justify-content: center;
+  max-width: 960px;
 }
 @media (max-width: 640px) {
   .wl-grid {
     grid-template-columns: 1fr;
   }
   .wl-grid.wl-focus {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
   }
 }
