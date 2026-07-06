@@ -178,9 +178,9 @@ export default function SettingsMenu({ pseudo, onPseudoChange, tone = "surface" 
       <button
         ref={btnRef}
         onClick={() => setOpen((o) => !o)}
-        aria-label="Réglages"
+        aria-label="Settings"
         aria-expanded={open}
-        title="Réglages"
+        title="Settings"
         className={`wl-lift flex h-[34px] w-[34px] items-center justify-center rounded-[11px] border ${btnClass}`}
       >
         <svg
@@ -203,24 +203,24 @@ export default function SettingsMenu({ pseudo, onPseudoChange, tone = "surface" 
         <div
           ref={panelRef}
           role="dialog"
-          aria-label="Réglages de l'interface"
+          aria-label="Interface settings"
           tabIndex={-1}
           className="absolute right-0 top-[42px] z-50 max-h-[min(78vh,560px)] w-[320px] overflow-y-auto rounded-[20px] border border-hairline bg-surface p-4 shadow-modal outline-none animate-wl-rise"
         >
-          <SectionLabel>Apparence</SectionLabel>
+          <SectionLabel>Appearance</SectionLabel>
           <PillChoice
-            label="Thème"
+            label="Theme"
             value={prefs.theme}
             options={[
-              { key: "papier" as const, label: "Papier" },
-              { key: "encre" as const, label: "Encre" },
+              { key: "papier" as const, label: "Paper" },
+              { key: "encre" as const, label: "Ink" },
             ]}
             onChange={(v) => setPrefs({ theme: v })}
           />
           <div
             className="mt-2.5 flex flex-wrap items-center gap-2"
             role="radiogroup"
-            aria-label="Couleur d'accent"
+            aria-label="Accent color"
           >
             {ACCENTS.map((a) => {
               const selected = prefs.accent === a.key;
@@ -229,7 +229,7 @@ export default function SettingsMenu({ pseudo, onPseudoChange, tone = "surface" 
                   key={a.key}
                   role="radio"
                   aria-checked={selected}
-                  aria-label={`Accent ${a.label}`}
+                  aria-label={`${a.label} accent`}
                   title={a.label}
                   tabIndex={selected ? 0 : -1}
                   onClick={() => setPrefs({ accent: a.key })}
@@ -274,10 +274,10 @@ export default function SettingsMenu({ pseudo, onPseudoChange, tone = "surface" 
 
           <SectionLabel>Timer</SectionLabel>
           <PillChoice
-            label="Style du timer"
+            label="Timer style"
             value={prefs.timerStyle}
             options={[
-              { key: "anneau" as const, label: "Anneau" },
+              { key: "anneau" as const, label: "Ring" },
               { key: "minimal" as const, label: "Minimal" },
             ]}
             onChange={(v) => setPrefs({ timerStyle: v })}
@@ -285,20 +285,20 @@ export default function SettingsMenu({ pseudo, onPseudoChange, tone = "surface" 
           <div className="mt-1.5">
             <Toggle
               on={prefs.timerSeconds}
-              label="Afficher les secondes"
-              hint="Sinon, minutes arrondies (dernière minute en secondes)"
+              label="Show seconds"
+              hint="Otherwise rounded minutes; the last minute shows seconds"
               onChange={(v) => setPrefs({ timerSeconds: v })}
             />
           </div>
 
-          <SectionLabel>Profil</SectionLabel>
+          <SectionLabel>Profile</SectionLabel>
           {onPseudoChange && (
             <div className="mb-2.5">
               <label
                 htmlFor="wl-pseudo"
                 className="mb-1.5 block text-sm font-semibold text-ink"
               >
-                Ton pseudo
+                Your name
               </label>
               <div className="flex gap-2">
                 <input
@@ -319,11 +319,11 @@ export default function SettingsMenu({ pseudo, onPseudoChange, tone = "surface" 
               </div>
             </div>
           )}
-          <div className="mb-1.5 text-sm font-semibold text-ink">Ta couleur</div>
+          <div className="mb-1.5 text-sm font-semibold text-ink">Your color</div>
           <div
             className="flex flex-wrap items-center gap-2"
             role="radiogroup"
-            aria-label="Teinte de ton avatar"
+            aria-label="Your avatar color"
             onKeyDown={(e) => {
               // Roving radio pattern: arrows move + select.
               const keys = ["", ...TINTS.map((t) => t.key)];
@@ -346,8 +346,8 @@ export default function SettingsMenu({ pseudo, onPseudoChange, tone = "surface" 
             <button
               role="radio"
               aria-checked={prefs.tint === ""}
-              aria-label="Automatique"
-              title="Automatique"
+              aria-label="Automatic"
+              title="Automatic"
               tabIndex={prefs.tint === "" ? 0 : -1}
               onClick={() => setPrefs({ tint: "" })}
               className="flex h-7 w-7 items-center justify-center rounded-full border bg-sunken text-[11px] font-bold text-text2"
@@ -394,24 +394,24 @@ export default function SettingsMenu({ pseudo, onPseudoChange, tone = "surface" 
             ))}
           </div>
 
-          <SectionLabel>Alertes</SectionLabel>
+          <SectionLabel>Alerts</SectionLabel>
           <div className="flex flex-col gap-0.5">
             <Toggle
               on={prefs.sound}
-              label="Son de fin"
-              hint="Carillon quand le timer se termine"
+              label="End chime"
+              hint="A soft chime when the timer ends"
               onChange={(v) => setPrefs({ sound: v })}
             />
             <Toggle
               on={prefs.notifications}
               label="Notifications"
-              hint="Alerte système en fin de session"
+              hint="System alert when the session ends"
               onChange={setNotifications}
             />
             <Toggle
               on={prefs.reducedMotion}
-              label="Animations réduites"
-              hint="Désactive levées et transitions"
+              label="Reduce motion"
+              hint="Turns off lifts and transitions"
               onChange={(v) => setPrefs({ reducedMotion: v })}
             />
           </div>

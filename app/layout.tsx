@@ -25,7 +25,7 @@ export default function RootLayout({
     // suppressHydrationWarning: the head script below sets data-wl-* theme
     // attributes before hydration (anti-flash), which React would otherwise
     // report as a server/client mismatch — same pattern as next-themes.
-    <html lang="fr" className={figtree.variable} suppressHydrationWarning>
+    <html lang="en" className={figtree.variable} suppressHydrationWarning>
       <head>
         {/* Apply theme / accent / reduced-motion before first paint
             (anti-flash: CSS variables key off these attributes). */}

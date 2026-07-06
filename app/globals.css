@@ -259,22 +259,37 @@ html.wl-reduce *::after {
   transition-duration: 0.001ms !important;
 }
 
-/* Room sidebar: collapsible on desktop, slide-in drawer on mobile. */
+/* Room sidebar: collapsible on desktop, slide-in drawer on mobile.
+   Smoothness notes: the inner content sits in a fixed-width wrapper
+   (.wl-sideinner) so it gets CLIPPED during the width animation instead of
+   reflowing/wrapping every frame, and `visibility` flips only at the END of
+   the collapse (transition-delay) instead of vanishing instantly. */
 .wl-sidebar {
   width: 252px;
   min-width: 252px;
+  overflow: hidden;
   transition:
-    width 0.3s cubic-bezier(0.2, 0.8, 0.3, 1),
-    min-width 0.3s cubic-bezier(0.2, 0.8, 0.3, 1),
-    background-color 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+    width 0.38s cubic-bezier(0.2, 0.8, 0.3, 1),
+    min-width 0.38s cubic-bezier(0.2, 0.8, 0.3, 1),
+    visibility 0s linear 0s;
+}
+.wl-sideinner {
+  width: 252px;
+  min-width: 252px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .wl-sidebar.wl-collapsed {
   width: 0;
   min-width: 0;
   border-right-color: transparent;
-  overflow: hidden;
-  /* Out of the tab order and the a11y tree while hidden. */
+  /* Out of the tab order and the a11y tree once fully closed. */
   visibility: hidden;
+  transition:
+    width 0.38s cubic-bezier(0.2, 0.8, 0.3, 1),
+    min-width 0.38s cubic-bezier(0.2, 0.8, 0.3, 1),
+    visibility 0s linear 0.38s;
 }
 .wl-openbtn {
   display: none;

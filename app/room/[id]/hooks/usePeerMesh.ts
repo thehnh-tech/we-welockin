@@ -23,7 +23,7 @@ export type RosterEntry = {
 export type Remote = { username: string; stream: MediaStream };
 
 const STALL_HINT =
-  "Impossible de te connecter aux autres sur ce réseau — certains Wi-Fi (entreprise, 4G) bloquent la vidéo. Essaie un autre réseau.";
+  "Can't reach the others on this network — some Wi-Fi networks (office, 4G) block video. Try another network.";
 
 // The WebRTC mesh: signaling presence via REST, calling every other peer
 // (lower id initiates), and tracking remote streams. The room metadata and the
@@ -102,7 +102,7 @@ export function usePeerMesh(opts: {
           if (res.status >= 400 && res.status < 500 && !cancelled) {
             console.error("announce rejected", res.status);
             setConnWarning(
-              "Ce lien semble invalide. Recharge la page ou demande un nouveau lien."
+              "This link looks invalid. Reload the page or ask for a fresh one."
             );
           }
           return;

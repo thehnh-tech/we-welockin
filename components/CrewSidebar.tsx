@@ -62,9 +62,10 @@ export default function CrewSidebar({
       <aside
         className={`wl-sidebar ${collapsed ? "wl-collapsed" : ""} ${
           mobOpen ? "wl-mobopen" : ""
-        } flex h-screen flex-col overflow-hidden border-r border-bandline bg-band text-bandtext`}
-        aria-label="Participants"
+        } h-screen border-r border-bandline bg-band text-bandtext`}
+        aria-label="Crew"
       >
+        <div className="wl-sideinner">
         <div className="px-[18px] pb-4 pt-5">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -76,7 +77,7 @@ export default function CrewSidebar({
             <button
               className="wl-collapsebtn h-[30px] w-[30px] items-center justify-center rounded-[8px] border border-bandline bg-bandchip text-bandtext2 transition-colors duration-150 hover:text-bandtext"
               onClick={onCollapse}
-              aria-label={mobOpen ? "Fermer le panneau" : "Replier le panneau"}
+              aria-label={mobOpen ? "Close panel" : "Collapse panel"}
             >
               <svg
                 width="16"
@@ -114,7 +115,7 @@ export default function CrewSidebar({
             Crew · {roster.length}
           </span>
           <span className="text-[11px] font-semibold text-bandtext2">
-            {focusedCount} en focus
+            {focusedCount} locked in
           </span>
         </div>
 
@@ -143,7 +144,7 @@ export default function CrewSidebar({
                       }`}
                     >
                       {p.username}
-                      {isSelf && " (toi)"}
+                      {isSelf && " (you)"}
                     </div>
                     <div className="mt-0.5 flex items-center gap-1.5">
                       <span
@@ -162,10 +163,10 @@ export default function CrewSidebar({
                         style={isSelf ? { opacity: 0.65 } : undefined}
                       >
                         {away
-                          ? "Absent"
+                          ? "Away"
                           : p.status.deep
                             ? "Deep Focus"
-                            : "Étudie"}
+                            : "Studying"}
                       </span>
                     </div>
                   </div>
@@ -203,8 +204,9 @@ export default function CrewSidebar({
               <path d="M16 17l5-5-5-5" />
               <path d="M21 12H9" />
             </svg>
-            Quitter la session
+            Leave session
           </button>
+        </div>
         </div>
       </aside>
     </>
