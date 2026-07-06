@@ -3,9 +3,14 @@
 import { useEffect, useState } from "react";
 
 // Interface preferences, persisted locally. Components subscribe via
-// usePrefs(); writes go through setPrefs() which notifies every subscriber.
+// usePrefs(); writes go through setPrefs() which applies the visual prefs to
+// <html> (data attributes consumed by CSS variables) and notifies subscribers.
 
 export type Prefs = {
+  theme: "papier" | "encre"; // light paper / warm dark
+  accent: string; // accent key (see ACCENTS in lib/theme)
+  timerStyle: "anneau" | "minimal";
+  timerSeconds: boolean; // show seconds on the chrono
   sound: boolean; // end-of-session chime
   notifications: boolean; // system notification at the end
   reducedMotion: boolean; // force-disable animations (on top of the OS setting)
@@ -13,6 +18,10 @@ export type Prefs = {
 };
 
 export const DEFAULT_PREFS: Prefs = {
+  theme: "papier",
+  accent: "terracotta",
+  timerStyle: "anneau",
+  timerSeconds: true,
   sound: true,
   notifications: true,
   reducedMotion: false,
@@ -22,12 +31,26 @@ export const DEFAULT_PREFS: Prefs = {
 const KEY = "wlis_prefs_v1";
 const EVENT = "wlis-prefs-changed";
 
+const THEMES = new Set(["papier", "encre"]);
+const ACCENT_KEYS = new Set([
+  "terracotta",
+  "vert",
+  "bleu",
+  "violet",
+  "sarcelle",
+  "ambre",
+]);
+
 export function getPrefs(): Prefs {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return DEFAULT_PREFS;
     const p = JSON.parse(raw);
     return {
+      theme: THEMES.has(p.theme) ? p.theme : "papier",
+      accent: ACCENT_KEYS.has(p.accent) ? p.accent : "terracotta",
+      timerStyle: p.timerStyle === "minimal" ? "minimal" : "anneau",
+      timerSeconds: p.timerSeconds !== false,
       sound: p.sound !== false,
       notifications: p.notifications !== false,
       reducedMotion: p.reducedMotion === true,
@@ -43,16 +66,41 @@ export function setPrefs(update: Partial<Prefs>): Prefs {
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {}
-  applyReducedMotion(next.reducedMotion);
+  applyVisualPrefs(next, true);
   try {
     window.dispatchEvent(new CustomEvent(EVENT));
   } catch {}
   return next;
 }
 
-export function applyReducedMotion(on: boolean): void {
+// Theme + accent live as data attributes on <html>; every color in the app is
+// a CSS variable keyed on them. A blanket CSS transition would pin stale
+// var-driven colors in Chromium, so switches disable transitions for a frame
+// and animate through the View Transitions API instead (smooth crossfade).
+export function applyVisualPrefs(p: Prefs, animate = false): void {
   try {
-    document.documentElement.classList.toggle("wl-reduce", on);
+    const el = document.documentElement;
+    const apply = () => {
+      el.classList.add("wl-notransition");
+      el.dataset.wlTheme = p.theme;
+      el.dataset.wlAccent = p.accent;
+      el.classList.toggle("wl-reduce", p.reducedMotion);
+      void el.offsetHeight; // flush styles with transitions off
+      requestAnimationFrame(() => el.classList.remove("wl-notransition"));
+    };
+    const vt = (
+      document as Document & {
+        startViewTransition?: (cb: () => void) => void;
+      }
+    ).startViewTransition;
+    const reduced =
+      p.reducedMotion ||
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (animate && vt && !reduced) {
+      vt.call(document, apply);
+    } else {
+      apply();
+    }
   } catch {}
 }
 
@@ -61,7 +109,7 @@ export function usePrefs(): Prefs {
   useEffect(() => {
     const sync = () => setState(getPrefs());
     sync();
-    applyReducedMotion(getPrefs().reducedMotion);
+    applyVisualPrefs(getPrefs());
     window.addEventListener(EVENT, sync);
     window.addEventListener("storage", sync);
     return () => {

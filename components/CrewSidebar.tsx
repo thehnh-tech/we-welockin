@@ -55,26 +55,26 @@ export default function CrewSidebar({
     <>
       <div
         className={`wl-backdrop ${mobOpen ? "wl-mobopen" : ""} fixed inset-0 z-40`}
-        style={{ background: "rgba(26,23,20,.35)" }}
+        style={{ background: "rgba(10, 8, 6, 0.45)" }}
         onClick={onCloseMobile}
         aria-hidden="true"
       />
       <aside
         className={`wl-sidebar ${collapsed ? "wl-collapsed" : ""} ${
           mobOpen ? "wl-mobopen" : ""
-        } flex h-screen flex-col overflow-hidden border-r border-hairline bg-cardalt`}
+        } flex h-screen flex-col overflow-hidden border-r border-bandline bg-band text-bandtext`}
         aria-label="Participants"
       >
         <div className="px-[18px] pb-4 pt-5">
-          <div className="mb-3.5 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-ink">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <Padlock locked={locked} size={18} />
               <span className="text-[13px] font-bold tracking-tight">
-                welock<span className="text-accentink">.in</span>
+                welock<span className="text-accent">.in</span>
               </span>
             </div>
             <button
-              className="wl-collapsebtn h-[30px] w-[30px] items-center justify-center rounded-[8px] border border-strong bg-surface text-text2 shadow-xs hover:text-ink"
+              className="wl-collapsebtn h-[30px] w-[30px] items-center justify-center rounded-[8px] border border-bandline bg-bandchip text-bandtext2 transition-colors duration-150 hover:text-bandtext"
               onClick={onCollapse}
               aria-label={mobOpen ? "Fermer le panneau" : "Replier le panneau"}
             >
@@ -93,27 +93,27 @@ export default function CrewSidebar({
               </svg>
             </button>
           </div>
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[.06em] text-bandtext3">
             Session
           </div>
           <div
-            className="overflow-hidden text-ellipsis whitespace-nowrap text-base font-bold text-ink"
+            className="overflow-hidden text-ellipsis whitespace-nowrap text-base font-bold"
             style={{ letterSpacing: "-0.02em" }}
           >
             {sessionName}
           </div>
           {subject && (
-            <div className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-text2">
+            <div className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-bandtext2">
               {subject}
             </div>
           )}
         </div>
 
         <div className="flex items-center justify-between px-[18px] pb-2.5 pt-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
+          <span className="text-[11px] font-semibold uppercase tracking-[.06em] text-bandtext3">
             Crew · {roster.length}
           </span>
-          <span className="text-[11px] font-semibold text-text3">
+          <span className="text-[11px] font-semibold text-bandtext2">
             {focusedCount} en focus
           </span>
         </div>
@@ -126,10 +126,8 @@ export default function CrewSidebar({
               return (
                 <li
                   key={p.peerId}
-                  className={`flex items-center gap-[11px] rounded-[11px] border p-2 transition-colors duration-150 ${
-                    isSelf
-                      ? "border-transparent bg-ink"
-                      : "border-transparent hover:bg-sunken"
+                  className={`flex items-center gap-[11px] rounded-[11px] p-2 transition-colors duration-200 ease-wl ${
+                    isSelf ? "bg-bandactive" : "hover:bg-bandchip"
                   }`}
                 >
                   <Avatar
@@ -141,7 +139,7 @@ export default function CrewSidebar({
                   <div className="min-w-0 flex-1">
                     <div
                       className={`overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold ${
-                        isSelf ? "text-surface" : "text-ink"
+                        isSelf ? "text-bandactivetext" : "text-bandtext"
                       }`}
                     >
                       {p.username}
@@ -150,13 +148,18 @@ export default function CrewSidebar({
                     <div className="mt-0.5 flex items-center gap-1.5">
                       <span
                         className="h-1.5 w-1.5 rounded-full"
-                        style={{ background: away ? "#b3aa9b" : "#54a078" }}
+                        style={{
+                          background: away
+                            ? "rgba(160, 152, 140, .8)"
+                            : "#54a078",
+                        }}
                         aria-hidden="true"
                       />
                       <span
                         className={`text-[11px] font-medium ${
-                          isSelf ? "text-surface/70" : "text-text3"
+                          isSelf ? "text-bandactivetext" : "text-bandtext2"
                         }`}
+                        style={isSelf ? { opacity: 0.65 } : undefined}
                       >
                         {away
                           ? "Absent"
@@ -168,8 +171,9 @@ export default function CrewSidebar({
                   </div>
                   <span
                     className={`text-[11px] font-semibold tabular-nums ${
-                      isSelf ? "text-surface/80" : "text-text3"
+                      isSelf ? "text-bandactivetext" : "text-bandtext2"
                     }`}
+                    style={isSelf ? { opacity: 0.75 } : undefined}
                   >
                     {formatShortDuration((now - p.joinedAt) / 1000)}
                   </span>
@@ -179,10 +183,10 @@ export default function CrewSidebar({
           </ul>
         </div>
 
-        <div className="border-t border-line px-[18px] pb-[18px] pt-3">
+        <div className="border-t border-bandline px-[18px] pb-[18px] pt-3">
           <button
             onClick={onLeave}
-            className="flex w-full items-center gap-2 rounded-full px-3 py-2 text-left text-[13px] font-semibold text-text2 transition-colors duration-150 hover:bg-dangertint hover:text-danger"
+            className="wl-band-danger flex w-full items-center gap-2 rounded-full px-3 py-2 text-left text-[13px] font-semibold text-bandtext2 transition-colors duration-150"
           >
             <svg
               width="15"

@@ -22,14 +22,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={figtree.variable}>
+    // suppressHydrationWarning: the head script below sets data-wl-* theme
+    // attributes before hydration (anti-flash), which React would otherwise
+    // report as a server/client mismatch — same pattern as next-themes.
+    <html lang="fr" className={figtree.variable} suppressHydrationWarning>
       <head>
-        {/* Apply the user's reduced-animations preference before first paint
-            (same pattern as dark-mode anti-flash scripts). */}
+        {/* Apply theme / accent / reduced-motion before first paint
+            (anti-flash: CSS variables key off these attributes). */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              'try{if(JSON.parse(localStorage.getItem("wlis_prefs_v1")||"{}").reducedMotion===true)document.documentElement.classList.add("wl-reduce")}catch(e){}',
+              'try{var p=JSON.parse(localStorage.getItem("wlis_prefs_v1")||"{}"),e=document.documentElement;e.dataset.wlTheme=["papier","encre"].indexOf(p.theme)>=0?p.theme:"papier";e.dataset.wlAccent=["terracotta","vert","bleu","violet","sarcelle","ambre"].indexOf(p.accent)>=0?p.accent:"terracotta";if(p.reducedMotion===true)e.classList.add("wl-reduce")}catch(e){}',
           }}
         />
       </head>
