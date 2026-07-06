@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { avatarColor, initials } from "@/lib/avatar";
+import Avatar from "@/components/Avatar";
 
 type Props = {
   stream: MediaStream | null;
   username: string;
+  tintKey?: string;
   muted?: boolean; // mute the audio element (self, or everyone in Deep Focus)
   mirrored?: boolean;
   isLocal?: boolean;
@@ -20,6 +21,7 @@ type Props = {
 export default function VideoTile({
   stream,
   username,
+  tintKey,
   muted = false,
   mirrored = false,
   isLocal = false,
@@ -78,11 +80,9 @@ export default function VideoTile({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border-2 transition-colors ${
-        isLocal ? "bg-tile" : "bg-panel2"
-      } ${showEq ? "border-accent" : "border-transparent"} ${
-        dimmed ? "opacity-60" : ""
-      }`}
+      className={`relative overflow-hidden rounded-[14px] border-2 bg-sunken shadow-xs transition-all duration-200 ease-wl ${
+        showEq ? "border-accent shadow-md" : "border-transparent"
+      } ${dimmed ? "opacity-60" : ""}`}
       style={{ aspectRatio: compact ? "1 / 1" : "16 / 11" }}
     >
       <video
@@ -96,37 +96,33 @@ export default function VideoTile({
       />
       {!hasVideo && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div
-            className="flex items-center justify-center rounded-full font-bold text-white"
-            style={{
-              width: compact ? 40 : 72,
-              height: compact ? 40 : 72,
-              fontSize: compact ? 15 : 26,
-              background: avatarColor(username),
-            }}
-          >
-            {initials(username)}
-          </div>
+          <Avatar
+            username={username}
+            tintKey={tintKey}
+            size={compact ? 40 : 72}
+            rounded="50%"
+          />
         </div>
       )}
 
       {/* Top-left: Deep Focus badge (own tile). */}
       {deepBadge && !compact && (
-        <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-2 py-1">
+        <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full border border-accent bg-accenttint px-2.5 py-1">
           <svg
             width="12"
             height="12"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#c7d2fe"
-            strokeWidth="2.2"
+            stroke="#c25a3a"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
             aria-hidden="true"
           >
-            <path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3" />
+            <path d="M3 18v-6a9 9 0 0118 0v6" />
+            <path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
           </svg>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">
+          <span className="text-[10px] font-semibold uppercase tracking-[.06em] text-accentink">
             Deep Focus
           </span>
         </div>
@@ -135,23 +131,24 @@ export default function VideoTile({
       {/* Top-right: speaking EQ, or mic-off icon. */}
       {showEq ? (
         <div
-          className="absolute right-3 top-3 flex h-[18px] items-end gap-[2px] rounded-lg bg-indigo-500/20 px-[7px] py-[5px]"
+          className="absolute right-3 top-3 flex h-[18px] items-end gap-[2px] rounded-full bg-accenttint px-[8px] py-[5px]"
           aria-label={`${username} parle`}
           role="img"
         >
-          <span className="w-[3px] rounded-sm bg-indigo-400 animate-wl-eq" />
+          <span className="w-[3px] rounded-sm bg-accentink animate-wl-eq" />
           <span
-            className="w-[3px] rounded-sm bg-indigo-400 animate-wl-eq"
+            className="w-[3px] rounded-sm bg-accentink animate-wl-eq"
             style={{ animationDelay: ".2s" }}
           />
           <span
-            className="w-[3px] rounded-sm bg-indigo-400 animate-wl-eq"
+            className="w-[3px] rounded-sm bg-accentink animate-wl-eq"
             style={{ animationDelay: ".4s" }}
           />
         </div>
       ) : micOff ? (
         <div
-          className="absolute right-3 top-3 flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-black/45"
+          className="absolute right-3 top-3 flex h-[26px] w-[26px] items-center justify-center rounded-[8px]"
+          style={{ background: "rgba(26,23,20,.55)" }}
           aria-label={`${username} : micro coupé`}
           role="img"
         >
@@ -160,7 +157,7 @@ export default function VideoTile({
             height="14"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#a1a1aa"
+            stroke="#fffefb"
             strokeWidth="2"
             strokeLinecap="round"
             aria-hidden="true"
@@ -172,18 +169,22 @@ export default function VideoTile({
         </div>
       ) : null}
 
-      {/* Bottom: name pill + focus time. */}
+      {/* Bottom: name pill + focus time — ink overlays for contrast on video. */}
       <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-end justify-between gap-2">
         <span
-          className={`max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full bg-black/55 px-2.5 py-1 font-semibold text-white ${
+          className={`max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full px-2.5 py-1 font-semibold ${
             compact ? "text-[10px]" : "text-xs"
           }`}
+          style={{ background: "rgba(26,23,20,.72)", color: "#fffefb" }}
         >
           {username}
           {isLocal && " (toi)"}
         </span>
         {focusTime && !compact && (
-          <span className="whitespace-nowrap rounded-md bg-black/50 px-[7px] py-[3px] font-mono text-[11px] font-semibold text-zinc-300">
+          <span
+            className="whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-semibold tabular-nums"
+            style={{ background: "rgba(26,23,20,.55)", color: "#fffefb" }}
+          >
             {focusTime}
           </span>
         )}

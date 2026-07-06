@@ -33,16 +33,28 @@ export function sanitizeSubject(subject: string | undefined): string {
   return (subject ?? "").toString().replace(CONTROL_CHARS, "").trim().slice(0, 60);
 }
 
+const TINT_KEYS = new Set([
+  "bleu",
+  "rose",
+  "vert",
+  "violet",
+  "ambre",
+  "sable",
+  "sarcelle",
+]);
+
 export function sanitizeStatus(status: unknown): {
   muted: boolean;
   away: boolean;
   deep: boolean;
+  tint: string;
 } {
   const s = (status ?? {}) as Record<string, unknown>;
   return {
     muted: s.muted === true,
     away: s.away === true,
     deep: s.deep === true,
+    tint: typeof s.tint === "string" && TINT_KEYS.has(s.tint) ? s.tint : "",
   };
 }
 

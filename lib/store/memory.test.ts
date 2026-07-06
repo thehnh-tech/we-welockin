@@ -95,18 +95,20 @@ describe("memoryBackend", () => {
       muted: true,
       away: false,
       deep: false,
+      tint: "",
     });
 
     const second = await memoryBackend.announce({
       roomId: id,
       peerId: "a",
       username: "A",
-      status: { muted: false, away: true, deep: true },
+      status: { muted: false, away: true, deep: true, tint: "sarcelle" },
     });
     expect(second.peers[0].status).toEqual({
       muted: false,
       away: true,
       deep: true,
+      tint: "sarcelle",
     });
   });
 

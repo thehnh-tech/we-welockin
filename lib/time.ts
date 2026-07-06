@@ -22,10 +22,12 @@ export function formatDuration(seconds: number): string {
   return `${h}:${pad(m)}:${pad(s)}`;
 }
 
-// Compact hours for stats: 6120 -> "1:42", 0 -> "0:00" (h:mm).
-export function formatHours(seconds: number): string {
+// Rounded human duration for stats (charte: numbers are always rounded):
+// 6120 -> "1h 42m", 2520 -> "42m", 0 -> "0m".
+export function formatShortDuration(seconds: number): string {
   const abs = Math.max(0, Math.floor(seconds));
   const h = Math.floor(abs / 3600);
   const m = Math.floor((abs % 3600) / 60);
-  return `${h}:${m.toString().padStart(2, "0")}`;
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m.toString().padStart(2, "0")}m`;
 }

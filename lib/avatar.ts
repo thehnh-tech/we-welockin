@@ -1,23 +1,29 @@
-// Deterministic avatar color + initials from a display name (mockup palette).
+// Letter tokens tinted with the charte's category palette (§ Couleurs) —
+// pastel background + darker letter, deterministic per display name.
 
-const PALETTE = [
-  "#0f766e", // teal-700
-  "#9333ea", // purple-600
-  "#b45309", // amber-700
-  "#1d4ed8", // blue-700
-  "#be123c", // rose-700
-  "#0369a1", // sky-700
-  "#7c3aed", // violet-600
-  "#15803d", // green-700
-  "#a16207", // yellow-700
+export type Tint = { key: string; label: string; bg: string; fg: string };
+
+export const TINTS: Tint[] = [
+  { key: "bleu", label: "Bleu", bg: "#dce8f3", fg: "#5a7db8" },
+  { key: "rose", label: "Rose", bg: "#fbe4e0", fg: "#b07a70" },
+  { key: "vert", label: "Vert", bg: "#ddefdc", fg: "#54a078" },
+  { key: "violet", label: "Violet", bg: "#ede3f0", fg: "#8a6b96" },
+  { key: "ambre", label: "Ambre", bg: "#f4e7d6", fg: "#b08646" },
+  { key: "sable", label: "Sable", bg: "#ece7df", fg: "#6b6258" },
+  { key: "sarcelle", label: "Sarcelle", bg: "#d8e6e4", fg: "#4f8a86" },
 ];
 
-export function avatarColor(name: string): string {
+export function tintByKey(key: string | undefined | null): Tint | null {
+  if (!key) return null;
+  return TINTS.find((t) => t.key === key) ?? null;
+}
+
+export function avatarTint(name: string): Tint {
   let h = 0;
   for (let i = 0; i < name.length; i++) {
     h = (h * 31 + name.charCodeAt(i)) >>> 0;
   }
-  return PALETTE[h % PALETTE.length];
+  return TINTS[h % TINTS.length];
 }
 
 export function initials(name: string): string {

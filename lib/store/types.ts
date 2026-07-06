@@ -3,6 +3,7 @@ export type PeerStatus = {
   muted: boolean;
   away: boolean;
   deep: boolean; // Deep Focus engaged
+  tint: string; // chosen avatar tint key ("" = automatic)
 };
 
 export type Peer = {
@@ -35,7 +36,7 @@ export type AnnounceInput = {
   subject?: string;
   durationSec?: number;
   startedAt?: number;
-  status?: Partial<PeerStatus>;
+  status?: Partial<PeerStatus> & { tint?: string };
 };
 
 // Both the in-memory and Redis implementations satisfy this async contract, so

@@ -5,7 +5,12 @@ import { buildPeerOptions, peerErrorMessage } from "@/lib/rtc-config";
 import { HEARTBEAT_MS, PEER_DROP_MS, STALL_HINT_MS } from "@/lib/constants";
 import type { RoomMeta } from "./useRoomMeta";
 
-export type PeerStatus = { muted: boolean; away: boolean; deep: boolean };
+export type PeerStatus = {
+  muted: boolean;
+  away: boolean;
+  deep: boolean;
+  tint: string;
+};
 
 export type RosterEntry = {
   peerId: string;

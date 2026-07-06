@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatClock } from "@/lib/time";
+import { getPrefs } from "@/lib/prefs";
 
 type Props = {
   startedAt: number;
@@ -47,9 +48,11 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
     return () => clearInterval(t);
   }, []);
 
-  // Ask once, up front, so we can still alert a backgrounded tab at the end.
+  // Ask once, up front, so we can still alert a backgrounded tab at the end
+  // (only if the user keeps notifications enabled).
   useEffect(() => {
     if (
+      getPrefs().notifications &&
       typeof Notification !== "undefined" &&
       Notification.permission === "default"
     ) {
@@ -69,22 +72,25 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
     firedRef.current = true;
     if (remainingSec <= -2) return; // joined an already-ended session
 
-    playChime();
+    const prefs = getPrefs();
+    if (prefs.sound) playChime();
 
     if (
+      prefs.notifications &&
       typeof Notification !== "undefined" &&
       Notification.permission === "granted"
     ) {
       try {
-        new Notification("Session terminée 🎉", {
-          body: "Le minuteur est arrivé à zéro.",
+        new Notification("Session terminée", {
+          body: "Le timer est arrivé à zéro. Bien joué.",
         });
       } catch {}
     }
 
     const reduceMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      prefs.reducedMotion ||
+      (typeof window !== "undefined" &&
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
 
     const original = document.title;
     let titleTimer: ReturnType<typeof setInterval> | null = null;
@@ -101,11 +107,11 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
     };
 
     if (reduceMotion) {
-      document.title = "⏰ Terminé !";
+      document.title = "Session terminée — welock.in";
     } else {
       let on = false;
       titleTimer = setInterval(() => {
-        document.title = on ? original : "⏰ Terminé !";
+        document.title = on ? original : "Session terminée — welock.in";
         on = !on;
       }, 1000);
     }
@@ -120,18 +126,18 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
     };
   }, [finished, remainingSec]);
 
-  // Mockup geometry: 168px ring (300px in focus mode).
-  const ringPx = big ? 300 : 168;
+  const ringPx = big ? 300 : 190;
   const strokeW = big ? 11 : 8;
   const r = ringPx / 2 - strokeW - 2;
   const mid = ringPx / 2;
   const circumference = 2 * Math.PI * r;
-  const color = finished ? "#22c55e" : "#6366f1";
+  // Accent = the one live moment on screen; finished settles back to ink.
+  const color = finished ? "#1a1714" : "#e07856";
 
   return (
     <div className="flex flex-col items-center justify-center">
       <div
-        className="relative transition-all duration-300"
+        className="relative transition-all duration-300 ease-wl"
         style={{ width: ringPx, height: ringPx }}
         role="timer"
         aria-label={
@@ -140,15 +146,6 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
             : `Temps restant : ${formatClock(remainingSec)}`
         }
       >
-        <span
-          aria-hidden="true"
-          className="absolute rounded-full animate-wl-breathe"
-          style={{
-            inset: 14,
-            background: color,
-            filter: `blur(${big ? 44 : 24}px)`,
-          }}
-        />
         <svg
           className="relative -rotate-90"
           width={ringPx}
@@ -161,7 +158,7 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
             cy={mid}
             r={r}
             fill="none"
-            stroke="#26262a"
+            stroke="#e7e1d6"
             strokeWidth={strokeW}
           />
           <circle
@@ -174,7 +171,7 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
             strokeLinecap="round"
             strokeDasharray={`${circumference}`}
             strokeDashoffset={`${circumference * (1 - progress)}`}
-            style={{ transition: "stroke-dashoffset 0.5s linear" }}
+            style={{ transition: "stroke-dashoffset 0.5s linear, stroke .3s" }}
           />
         </svg>
         <div
@@ -182,19 +179,20 @@ export default function Timer({ startedAt, durationSec, big = false }: Props) {
           aria-hidden="true"
         >
           <span
-            className="font-bold uppercase"
-            style={{
-              fontSize: big ? 13 : 10,
-              letterSpacing: ".16em",
-              color: finished ? "#4ade80" : "#818cf8",
-              marginBottom: 3,
-            }}
+            className="mb-1 flex items-center gap-1.5 font-semibold uppercase text-text3"
+            style={{ fontSize: 11, letterSpacing: ".06em" }}
           >
+            {!finished && (
+              <span
+                className="h-1.5 w-1.5 rounded-full animate-wl-live"
+                style={{ background: "#e07856" }}
+              />
+            )}
             {finished ? "Terminé" : "Focus"}
           </span>
           <span
-            className="font-mono font-bold leading-none tracking-tight text-white tabular-nums"
-            style={{ fontSize: big ? 56 : 26 }}
+            className="font-bold leading-none text-ink tabular-nums"
+            style={{ fontSize: big ? 72 : 46, letterSpacing: "-0.03em" }}
           >
             {finished ? "00:00" : formatClock(remainingSec)}
           </span>

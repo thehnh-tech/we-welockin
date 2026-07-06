@@ -4,8 +4,8 @@
 
 html,
 body {
-  background: #161618;
-  color: #fff;
+  background: #efeae0; /* canvas — papier chaud, jamais blanc pur */
+  color: #1a1714; /* encre */
   min-height: 100vh;
 }
 
@@ -13,8 +13,13 @@ body {
   box-sizing: border-box;
 }
 
+::selection {
+  background: #f5e4dd; /* accent tint */
+  color: #1a1714;
+}
+
 button:disabled {
-  opacity: 0.5;
+  color: #b3aa9b; /* faint */
   cursor: not-allowed;
 }
 
@@ -24,9 +29,13 @@ select {
   font: inherit;
 }
 
-/* Visible keyboard focus on the dark theme. */
+::placeholder {
+  color: #c4bbac;
+}
+
+/* Visible keyboard focus — accent, jamais décoratif ailleurs. */
 :focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid #e07856;
   outline-offset: 2px;
 }
 
@@ -34,7 +43,7 @@ select {
   width: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #3a3a3f;
+  background: #d6cfc2;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-track {
@@ -53,6 +62,26 @@ select {
   border: 0;
 }
 
+/* Mouvement §08 : bref et feutré. Survol = levée + ombre LG ; appui = scale(.98).
+   Appliqué aux éléments interactifs marqués .wl-lift. */
+.wl-lift {
+  transition:
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1),
+    box-shadow 0.18s cubic-bezier(0.2, 0.8, 0.3, 1),
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.wl-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(26, 23, 20, 0.12);
+}
+.wl-lift:active {
+  transform: scale(0.98);
+  box-shadow: 0 1px 2px rgba(26, 23, 20, 0.04);
+}
+
+/* Réduction de mouvement : préférence système OU réglage utilisateur. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -62,14 +91,21 @@ select {
     transition-duration: 0.001ms !important;
   }
 }
+html.wl-reduce *,
+html.wl-reduce *::before,
+html.wl-reduce *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
 
 /* Room sidebar: collapsible on desktop, slide-in drawer on mobile. */
 .wl-sidebar {
   width: 248px;
   min-width: 248px;
   transition:
-    width 0.25s ease,
-    min-width 0.25s ease;
+    width 0.25s cubic-bezier(0.2, 0.8, 0.3, 1),
+    min-width 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 .wl-sidebar.wl-collapsed {
   width: 0;
@@ -101,10 +137,10 @@ select {
     height: 100vh;
     transform: translateX(-100%);
     transition:
-      transform 0.28s ease,
+      transform 0.28s cubic-bezier(0.2, 0.8, 0.3, 1),
       visibility 0.28s;
     z-index: 50;
-    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 30px 80px rgba(26, 23, 20, 0.18);
     /* Closed drawer: hidden from keyboard + screen readers. */
     visibility: hidden;
   }

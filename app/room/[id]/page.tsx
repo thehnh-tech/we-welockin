@@ -11,9 +11,11 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getPseudo } from "@/lib/cookies";
 import { displayRoomCode } from "@/lib/roomCode";
 import { formatDuration } from "@/lib/time";
+import { usePrefs } from "@/lib/prefs";
 import VideoTile from "@/components/VideoTile";
 import Timer from "@/components/Timer";
 import CrewSidebar from "@/components/CrewSidebar";
+import SettingsMenu from "@/components/SettingsMenu";
 import { useRoomMeta } from "./hooks/useRoomMeta";
 import { useLocalMedia } from "./hooks/useLocalMedia";
 import { usePeerMesh, type PeerStatus } from "./hooks/usePeerMesh";
@@ -30,6 +32,39 @@ export default function RoomPage() {
   );
 }
 
+// Pill control — charte §07: at rest surface + hairline; engaged = ink fill.
+function ControlPill({
+  onClick,
+  disabled = false,
+  pressed,
+  label,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  pressed: boolean;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={pressed}
+      aria-label={label}
+      className={`wl-lift flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold ${
+        disabled
+          ? "border-hairline bg-card text-faint"
+          : pressed
+            ? "border-transparent bg-ink text-surface shadow-sm"
+            : "border-strong bg-surface text-ink2 shadow-xs hover:text-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 function RoomInner() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -42,6 +77,7 @@ function RoomInner() {
   const [focusMode, setFocusMode] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobOpen, setMobOpen] = useState(false);
+  const prefs = usePrefs();
 
   // Read pseudo (bounce home if absent).
   useEffect(() => {
@@ -78,7 +114,12 @@ function RoomInner() {
 
   // Live status, read by the mesh at each heartbeat (updated in the effect
   // below so the mesh never needs to re-run on a status change).
-  const statusRef = useRef<PeerStatus>({ muted: false, away: false, deep: false });
+  const statusRef = useRef<PeerStatus>({
+    muted: false,
+    away: false,
+    deep: false,
+    tint: "",
+  });
 
   const {
     connected,
@@ -92,10 +133,10 @@ function RoomInner() {
 
   // Push status changes immediately instead of waiting for the heartbeat.
   useEffect(() => {
-    statusRef.current = { muted: effectiveMuted, away, deep };
+    statusRef.current = { muted: effectiveMuted, away, deep, tint: prefs.tint };
     refreshStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveMuted, away, deep]);
+  }, [effectiveMuted, away, deep, prefs.tint]);
 
   useFocusRecorder(connected);
   const now = useNow(1000);
@@ -175,11 +216,11 @@ function RoomInner() {
   if (roomError) {
     return (
       <main className="flex min-h-screen items-center justify-center p-6">
-        <div className="max-w-sm rounded-2xl border border-line bg-panel p-8 text-center">
-          <p className="mb-5 text-base font-medium text-zinc-200">{roomError}</p>
+        <div className="w-full max-w-sm rounded-[20px] border border-hairline bg-surface p-8 text-center shadow-md animate-wl-rise">
+          <p className="mb-5 text-[15px] font-medium text-ink">{roomError}</p>
           <button
             onClick={() => router.push("/")}
-            className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold hover:brightness-110"
+            className="wl-lift rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface"
           >
             Retour à l&apos;accueil
           </button>
@@ -191,33 +232,36 @@ function RoomInner() {
   if (mediaError) {
     return (
       <main className="flex min-h-screen items-center justify-center p-6">
-        <div className="max-w-sm rounded-2xl border border-line bg-panel p-8 text-center">
-          <p className="mb-5 text-base font-medium text-zinc-200">{mediaError}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mr-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold hover:brightness-110"
-          >
-            Réessayer
-          </button>
-          <button
-            onClick={() => router.push("/")}
-            className="rounded-xl border border-line2 bg-transparent px-5 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-line"
-          >
-            Accueil
-          </button>
+        <div className="w-full max-w-sm rounded-[20px] border border-hairline bg-surface p-8 text-center shadow-md animate-wl-rise">
+          <p className="mb-5 text-[15px] font-medium text-ink">{mediaError}</p>
+          <div className="flex justify-center gap-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="wl-lift rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface"
+            >
+              Réessayer
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="wl-lift rounded-full border border-strong bg-surface px-5 py-2.5 text-sm font-semibold text-ink2"
+            >
+              Accueil
+            </button>
+          </div>
         </div>
       </main>
     );
   }
 
   return (
-    <div className="flex h-screen min-h-[600px] w-full overflow-hidden bg-bg text-white">
+    <div className="flex h-screen min-h-[600px] w-full overflow-hidden bg-canvas text-ink">
       <CrewSidebar
         sessionName={room?.name ?? "Room"}
         subject={room?.subject ?? ""}
         roster={roster}
         myPeerId={myPeerId}
         now={now}
+        locked={connected}
         collapsed={collapsed}
         mobOpen={mobOpen}
         onCollapse={() => {
@@ -230,7 +274,7 @@ function RoomInner() {
 
       <main className="relative h-screen min-w-0 flex-1 overflow-y-auto">
         <button
-          className={`wl-openbtn ${collapsed ? "wl-show" : ""} absolute left-[18px] top-[18px] z-20 h-10 w-10 items-center justify-center rounded-xl border border-line2 bg-panel text-zinc-200 hover:bg-line`}
+          className={`wl-openbtn ${collapsed ? "wl-show" : ""} wl-lift absolute left-[18px] top-[18px] z-20 h-10 w-10 items-center justify-center rounded-[11px] border border-strong bg-surface text-ink2 shadow-xs`}
           onClick={() => {
             setCollapsed(false);
             setMobOpen(true);
@@ -251,64 +295,78 @@ function RoomInner() {
           </svg>
         </button>
 
-        <div className="absolute right-[18px] top-[18px] z-20 flex items-center gap-2 rounded-xl border border-line2 bg-panel py-[7px] pl-[13px] pr-[9px]">
-          <span className="text-[11px] font-bold tracking-wider text-zinc-500">
-            ROOM
-          </span>
-          <span className="font-mono text-sm font-bold tracking-wider text-zinc-200">
-            {roomId ? displayRoomCode(roomId) : ""}
-          </span>
-          <button
-            onClick={copyLink}
-            aria-label="Copier le lien d'invitation"
-            title="Copier le lien d'invitation"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-line2 hover:text-white"
-          >
-            {copied ? (
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#22c55e"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M20 6L9 17l-5-5" />
-              </svg>
-            ) : (
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect x="9" y="9" width="11" height="11" rx="2" />
-                <path d="M5 15V5a2 2 0 012-2h10" />
-              </svg>
-            )}
-          </button>
+        <div className="absolute right-[18px] top-[18px] z-20 flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-[11px] border border-hairline bg-surface py-[7px] pl-[13px] pr-[9px] shadow-xs">
+            <span className="text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
+              Room
+            </span>
+            <span className="text-sm font-bold tracking-wide text-ink tabular-nums">
+              {roomId ? displayRoomCode(roomId) : ""}
+            </span>
+            <button
+              onClick={copyLink}
+              aria-label="Copier le lien d'invitation"
+              title="Copier le lien d'invitation"
+              className="flex h-7 w-7 items-center justify-center rounded-[8px] text-text2 transition-colors duration-150 hover:bg-sunken hover:text-ink"
+            >
+              {copied ? (
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#54a078"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              ) : (
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="9" y="9" width="11" height="11" rx="2" />
+                  <path d="M5 15V5a2 2 0 012-2h10" />
+                </svg>
+              )}
+            </button>
+          </div>
+          <SettingsMenu />
         </div>
 
         {banner && (
           <div
             role="status"
-            className="mx-auto mt-[70px] flex max-w-xl items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/15 px-4 py-2 text-sm text-amber-200"
+            className="mx-auto mt-[74px] flex max-w-xl items-center justify-between gap-3 rounded-[14px] border border-hairline bg-dangertint px-4 py-2.5 text-sm font-medium text-danger shadow-md animate-wl-toast"
           >
             <span>{banner}</span>
             <button
               onClick={dismissWarning}
               aria-label="Masquer l'avertissement"
-              className="shrink-0 text-amber-200/70 hover:text-amber-100"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-danger/70 hover:bg-danger/10 hover:text-danger"
             >
-              ✕
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
             </button>
           </div>
         )}
@@ -316,7 +374,7 @@ function RoomInner() {
         <section
           className={`flex flex-col items-center px-6 ${
             banner ? "pt-5" : focusMode ? "pt-[34px]" : "pt-16"
-          } pb-6`}
+          } pb-6 animate-wl-rise`}
         >
           {room && (
             <Timer
@@ -325,58 +383,42 @@ function RoomInner() {
               big={focusMode}
             />
           )}
-          <div className="mt-3 text-[13px] font-medium text-zinc-400">
+          <div className="mt-3 text-[13.5px] text-text2">
             {deep
-              ? "Deep Focus · tout est silencieux, ton micro est coupé"
-              : "Lock in · reste concentré jusqu'à la fin du timer"}
+              ? "Deep Focus — tout est silencieux, ton micro est coupé"
+              : "Lock in — reste concentré jusqu'à la fin du timer"}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
-            <button
+            <ControlPill
               onClick={toggleMute}
               disabled={deep}
-              aria-pressed={effectiveMuted}
-              aria-label={
+              pressed={effectiveMuted}
+              label={
                 deep
                   ? "Micro coupé par le Deep Focus"
                   : muted
                     ? "Réactiver le micro"
                     : "Couper le micro"
               }
-              className={`flex items-center gap-2 rounded-[9px] border px-3.5 py-2 text-xs font-semibold transition-colors ${
-                deep
-                  ? "border-line2 bg-panel text-zinc-600"
-                  : muted
-                    ? "border-line2 bg-panel text-zinc-400 hover:border-accent hover:text-white"
-                    : "border-accent bg-indigo-500/15 text-indigo-200"
-              }`}
             >
               <MicIcon off={effectiveMuted} />
               {deep ? "Micro coupé" : muted ? "Réactiver" : "Micro"}
-            </button>
+            </ControlPill>
 
-            <button
+            <ControlPill
               onClick={toggleCam}
-              aria-pressed={camOff}
-              aria-label={camOff ? "Réactiver la caméra" : "Couper la caméra"}
-              className={`flex items-center gap-2 rounded-[9px] border px-3.5 py-2 text-xs font-semibold transition-colors ${
-                camOff
-                  ? "border-line2 bg-panel text-zinc-400 hover:border-accent hover:text-white"
-                  : "border-accent bg-indigo-500/15 text-indigo-200"
-              }`}
+              pressed={camOff}
+              label={camOff ? "Réactiver la caméra" : "Couper la caméra"}
             >
               <CamIcon off={camOff} />
               {camOff ? "Caméra coupée" : "Caméra"}
-            </button>
+            </ControlPill>
 
-            <button
+            <ControlPill
               onClick={() => setDeep((d) => !d)}
-              aria-pressed={deep}
-              className={`flex items-center gap-2 rounded-[9px] border px-3.5 py-2 text-xs font-semibold transition-colors ${
-                deep
-                  ? "border-accent bg-indigo-500/15 text-indigo-200"
-                  : "border-line2 bg-panel text-zinc-400 hover:border-accent hover:text-white"
-              }`}
+              pressed={deep}
+              label={deep ? "Quitter le Deep Focus" : "Activer le Deep Focus"}
             >
               <svg
                 width="14"
@@ -393,16 +435,12 @@ function RoomInner() {
                 <path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
               </svg>
               {deep ? "Quitter le Deep Focus" : "Deep Focus"}
-            </button>
+            </ControlPill>
 
-            <button
+            <ControlPill
               onClick={toggleFocus}
-              aria-pressed={focusMode}
-              className={`flex items-center gap-2 rounded-[9px] border px-3.5 py-2 text-xs font-semibold transition-colors ${
-                focusMode
-                  ? "border-accent bg-indigo-500/15 text-indigo-200"
-                  : "border-line2 bg-panel text-zinc-400 hover:border-accent hover:text-white"
-              }`}
+              pressed={focusMode}
+              label={focusMode ? "Quitter le mode focus" : "Passer en mode focus"}
             >
               <svg
                 width="14"
@@ -422,7 +460,7 @@ function RoomInner() {
                 )}
               </svg>
               {focusMode ? "Quitter le mode focus" : "Mode focus"}
-            </button>
+            </ControlPill>
           </div>
 
           <div className="sr-only" aria-live="polite">
@@ -442,6 +480,7 @@ function RoomInner() {
           <VideoTile
             stream={localStream}
             username={pseudo ?? "Toi"}
+            tintKey={prefs.tint}
             muted
             mirrored
             isLocal
@@ -464,6 +503,7 @@ function RoomInner() {
                 key={peerId}
                 stream={info.stream}
                 username={info.username}
+                tintKey={st?.tint}
                 muted={deep}
                 compact={focusMode}
                 speaking={speaking.has(peerId) && !remoteMicOff && !deep}
