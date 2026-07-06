@@ -48,6 +48,7 @@ export async function POST(
     subject?: string;
     durationSec?: number;
     startedAt?: number;
+    visibility?: string;
     status?: { muted?: boolean; away?: boolean; deep?: boolean };
   };
   try {
@@ -69,6 +70,7 @@ export async function POST(
     subject: body.subject,
     durationSec: body.durationSec,
     startedAt: body.startedAt,
+    visibility: body.visibility,
     status: body.status,
   });
   // `room` is already the public meta shape { id, name, durationSec, startedAt }.

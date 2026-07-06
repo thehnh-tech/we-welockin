@@ -234,6 +234,22 @@ en live mesurée au DOM, timer Minimal/« 25 min » vérifiés, room en zones en
 
 ---
 
+## Phase 6c — Feedback pass 2 ✅ FAIT (branche `polish-vibes`)
+
+- [x] **Rooms publiques / privées** — pilules au créateur ; privée = jamais listée dans Live rooms,
+      joignable uniquement par code/lien (`visibility` bout en bout, immuable après création, testé).
+- [x] **Carte Join restructurée** — compacte, texte utile (« Private rooms can only be joined this way »).
+- [x] **Durées sans unité collée** — « 42 min », « 1h 42 » (`formatShortDuration`, testé).
+- [x] **Thème Papier adouci** — canvas #e9e2d4, surfaces crème (fini le quasi-blanc agressif).
+- [x] **Temps retirés de la sidebar** (déjà retirés des tuiles au pass précédent).
+- [x] **1 session par appareil** — sonde BroadcastChannel avant d'ouvrir la caméra ; écran
+      « One session per device » ; testé dans les deux sens (bloqué / débloqué).
+- [x] **Tuiles du mode focus agrandies** — auto-fit 160–220px centré (fini les vignettes minuscules).
+- [x] **Rétractation sidebar fluide** — glissement `margin-left` du bloc entier (contenu jamais
+      re-layouté) + `visibility` différée en fin d'animation.
+
+---
+
 ## Phase 7 — Scale au-delà du mesh (à la demande)
 
 **Déclencheur :** besoin récurrent de > 5–6 participants par room.

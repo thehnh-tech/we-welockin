@@ -21,10 +21,10 @@ describe("formatClock", () => {
 });
 
 describe("formatShortDuration", () => {
-  it("formats rounded human durations", () => {
-    expect(formatShortDuration(0)).toBe("0m");
-    expect(formatShortDuration(2520)).toBe("42m");
-    expect(formatShortDuration(6120)).toBe("1h 42m");
-    expect(formatShortDuration(38 * 3600)).toBe("38h 00m");
+  it("formats rounded human durations without glued unit suffixes", () => {
+    expect(formatShortDuration(0)).toBe("0 min");
+    expect(formatShortDuration(2520)).toBe("42 min");
+    expect(formatShortDuration(6120)).toBe("1h 42");
+    expect(formatShortDuration(38 * 3600)).toBe("38h 00");
   });
 });

@@ -8,6 +8,7 @@ import {
   sanitizeStatus,
   sanitizeSubject,
   sanitizeUsername,
+  sanitizeVisibility,
 } from "./sanitize";
 
 const BELL = String.fromCharCode(7);
@@ -106,5 +107,15 @@ describe("sanitizeStatus", () => {
     expect(sanitizeStatus({ tint: "vert" }).tint).toBe("vert");
     expect(sanitizeStatus({ tint: "neon" }).tint).toBe("");
     expect(sanitizeStatus({ tint: 42 }).tint).toBe("");
+  });
+});
+
+describe("sanitizeVisibility", () => {
+  it("only accepts the exact private value", () => {
+    expect(sanitizeVisibility("private")).toBe("private");
+    expect(sanitizeVisibility("public")).toBe("public");
+    expect(sanitizeVisibility("PRIVATE")).toBe("public");
+    expect(sanitizeVisibility(undefined)).toBe("public");
+    expect(sanitizeVisibility(1)).toBe("public");
   });
 });

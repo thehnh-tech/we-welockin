@@ -143,4 +143,32 @@ describe("memoryBackend", () => {
     room = await memoryBackend.getRoom(id);
     expect(room?.deep).toBe(true);
   });
+
+  it("keeps private rooms out of discovery but reachable by id", async () => {
+    const id = rid();
+    await memoryBackend.announce({
+      roomId: id,
+      peerId: "a",
+      username: "A",
+      visibility: "private",
+    });
+    const listed = await memoryBackend.listActiveRooms();
+    expect(listed.find((r) => r.id === id)).toBeUndefined();
+    const room = await memoryBackend.getRoom(id);
+    expect(room?.visibility).toBe("private");
+    expect(room?.peerCount).toBe(1);
+  });
+
+  it("cannot flip a room private after creation", async () => {
+    const id = rid();
+    await memoryBackend.announce({ roomId: id, peerId: "a", username: "A" });
+    await memoryBackend.announce({
+      roomId: id,
+      peerId: "b",
+      username: "B",
+      visibility: "private",
+    });
+    const room = await memoryBackend.getRoom(id);
+    expect(room?.visibility).toBe("public");
+  });
 });

@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import Avatar from "@/components/Avatar";
 import Padlock from "@/components/Padlock";
-import { formatShortDuration } from "@/lib/time";
 import type { RosterEntry } from "@/app/room/[id]/hooks/usePeerMesh";
 
 type Props = {
@@ -11,7 +10,6 @@ type Props = {
   subject: string;
   roster: RosterEntry[];
   myPeerId: string | null;
-  now: number;
   locked: boolean; // session running -> the brand padlock is closed
   collapsed: boolean;
   mobOpen: boolean;
@@ -25,7 +23,6 @@ export default function CrewSidebar({
   subject,
   roster,
   myPeerId,
-  now,
   locked,
   collapsed,
   mobOpen,
@@ -170,14 +167,6 @@ export default function CrewSidebar({
                       </span>
                     </div>
                   </div>
-                  <span
-                    className={`text-[11px] font-semibold tabular-nums ${
-                      isSelf ? "text-bandactivetext" : "text-bandtext2"
-                    }`}
-                    style={isSelf ? { opacity: 0.75 } : undefined}
-                  >
-                    {formatShortDuration((now - p.joinedAt) / 1000)}
-                  </span>
                 </li>
               );
             })}

@@ -11,14 +11,13 @@ export function formatClock(seconds: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-// Rounded human duration for stats and per-person focus times (charte §03/§09:
-// numbers shown to the user are always rounded — h:mm:ss is reserved for the
-// central chrono):
-// 6120 -> "1h 42m", 2520 -> "42m", 0 -> "0m".
+// Rounded human duration for stats (charter: numbers shown to the user are
+// always rounded — h:mm:ss is reserved for the central chrono). No glued unit
+// suffixes: 2520 -> "42 min", 6120 -> "1h 42", 0 -> "0 min".
 export function formatShortDuration(seconds: number): string {
   const abs = Math.max(0, Math.floor(seconds));
   const h = Math.floor(abs / 3600);
   const m = Math.floor((abs % 3600) / 60);
-  if (h === 0) return `${m}m`;
-  return `${h}h ${m.toString().padStart(2, "0")}m`;
+  if (h === 0) return `${m} min`;
+  return `${h}h ${m.toString().padStart(2, "0")}`;
 }

@@ -18,6 +18,7 @@ import {
   sanitizeStatus,
   sanitizeSubject,
   sanitizeUsername,
+  sanitizeVisibility,
 } from "./sanitize";
 
 type MemRoom = RoomMeta & {
@@ -75,6 +76,7 @@ function toPublic(room: MemRoom): RoomPublic {
     subject: room.subject,
     durationSec: room.durationSec,
     startedAt: room.startedAt,
+    visibility: room.visibility,
     peerCount: room.peers.size,
     deep: anyDeep(room),
     peerNames: Array.from(room.peers.values(), (p) => p.username).slice(0, 4),
@@ -88,6 +90,7 @@ function toMeta(room: MemRoom): RoomMeta {
     subject: room.subject,
     durationSec: room.durationSec,
     startedAt: room.startedAt,
+    visibility: room.visibility,
   };
 }
 
@@ -102,8 +105,9 @@ export const memoryBackend: StoreBackend = {
   async listActiveRooms() {
     const now = Date.now();
     cleanupAll(now);
+    // Private rooms never show up in discovery — code/link only.
     return Array.from(store.rooms.values())
-      .filter((r) => r.peers.size > 0)
+      .filter((r) => r.peers.size > 0 && r.visibility === "public")
       .sort((a, b) => b.startedAt - a.startedAt)
       .map(toPublic);
   },
@@ -123,6 +127,7 @@ export const memoryBackend: StoreBackend = {
         subject: sanitizeSubject(input.subject),
         durationSec,
         startedAt,
+        visibility: sanitizeVisibility(input.visibility),
         peers: new Map(),
         emptySince: null,
       };

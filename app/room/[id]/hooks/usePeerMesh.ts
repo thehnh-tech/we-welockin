@@ -92,6 +92,7 @@ export function usePeerMesh(opts: {
             subject: r?.subject,
             durationSec: r?.durationSec,
             startedAt: r?.startedAt,
+            visibility: r?.visibility,
             status: statusRef.current,
           }),
         });

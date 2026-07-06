@@ -20,8 +20,8 @@ import { useLocalMedia } from "./hooks/useLocalMedia";
 import { usePeerMesh, type PeerStatus } from "./hooks/usePeerMesh";
 import { useAway } from "./hooks/useAway";
 import { useSpeaking } from "./hooks/useSpeaking";
-import { useNow } from "./hooks/useNow";
 import { useFocusRecorder } from "./hooks/useFocusRecorder";
+import { useDeviceGuard } from "./hooks/useDeviceGuard";
 
 export default function RoomPage() {
   return (
@@ -93,11 +93,15 @@ function RoomInner() {
     searchParams?.get("n") ?? null,
     searchParams?.get("d") ?? null,
     searchParams?.get("s") ?? null,
-    searchParams?.get("sub") ?? null
+    searchParams?.get("sub") ?? null,
+    searchParams?.get("p") ?? null
   );
 
+  // One live session per device: probe other tabs before touching the camera.
+  const { ready: deviceReady, blocked } = useDeviceGuard(roomId);
+
   const { localStream, mediaError, muted, camOff, toggleMute, toggleCam } =
-    useLocalMedia(!!pseudo && !!room);
+    useLocalMedia(!!pseudo && !!room && deviceReady && !blocked);
 
   const away = useAway();
   const effectiveMuted = muted || deep;
@@ -138,7 +142,6 @@ function RoomInner() {
   }, [effectiveMuted, away, deep, prefs.tint]);
 
   useFocusRecorder(connected);
-  const now = useNow(1000);
 
   // Voice activity: local stream under the "self" key + every remote.
   const speakingStreams = useMemo(() => {
@@ -211,6 +214,36 @@ function RoomInner() {
   }, [roster]);
   const remotesList = useMemo(() => Array.from(remotes.entries()), [remotes]);
 
+  if (blocked) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <div className="w-full max-w-sm rounded-[20px] border border-hairline bg-surface p-8 text-center shadow-md animate-wl-rise">
+          <p className="mb-2 text-[17px] font-bold text-ink">
+            One session per device
+          </p>
+          <p className="mb-5 text-sm text-text2">
+            You&apos;re already locked in from another tab. Use that one, or
+            close it and reload here.
+          </p>
+          <div className="flex justify-center gap-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="wl-lift rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface"
+            >
+              Reload
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="wl-lift rounded-full border border-strong bg-surface px-5 py-2.5 text-sm font-semibold text-ink2"
+            >
+              Home
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   if (roomError) {
     return (
       <main className="flex min-h-screen items-center justify-center p-6">
@@ -258,7 +291,6 @@ function RoomInner() {
         subject={room?.subject ?? ""}
         roster={roster}
         myPeerId={myPeerId}
-        now={now}
         locked={connected}
         collapsed={collapsed}
         mobOpen={mobOpen}
