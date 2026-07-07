@@ -250,6 +250,18 @@ en live mesurée au DOM, timer Minimal/« 25 min » vérifiés, room en zones en
 
 ---
 
+## Phase 6d — Tout privé + compteur d'actifs ✅ FAIT (branche `all-private`)
+
+- [x] **Suppression du système de rooms publiques** — plus de section Live rooms ni de choix
+      public/privé : toute room créée est **privée** (code/lien uniquement).
+- [x] **Compteur d'utilisateurs actifs** — `GET /api/rooms` ne renvoie plus que
+      `{ activeUsers }` = **plancher marketing 130** + total réel des pairs (tous rooms confondus,
+      `countActivePeers` dans les 2 backends, testé). Affiché dans le bandeau avec le dot vert.
+- [x] La plomberie `visibility` reste en place côté store (deep links, anti-flip) — seule l'UI de
+      choix a disparu.
+
+---
+
 ## Phase 7 — Scale au-delà du mesh (à la demande)
 
 **Déclencheur :** besoin récurrent de > 5–6 participants par room.

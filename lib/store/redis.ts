@@ -188,6 +188,20 @@ export const redisBackend: StoreBackend = {
     return out;
   },
 
+  async countActivePeers() {
+    const r = redis();
+    const ids = await r.zrange<string[]>(INDEX, 0, MAX_LIST_ROOMS - 1, {
+      rev: true,
+    });
+    // zcard may include peers up to PEER_TIMEOUT_MS stale — fine for a
+    // vanity counter, and much cheaper than pruning every room on each poll.
+    let total = 0;
+    for (const id of ids) {
+      total += await r.zcard(peersKey(id));
+    }
+    return total;
+  },
+
   async announce(input: AnnounceInput) {
     const r = redis();
     const now = Date.now();

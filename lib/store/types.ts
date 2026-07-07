@@ -46,6 +46,7 @@ export type AnnounceInput = {
 export interface StoreBackend {
   getRoom(id: string): Promise<RoomPublic | null>;
   listActiveRooms(): Promise<RoomPublic[]>;
+  countActivePeers(): Promise<number>; // across ALL rooms (visibility-blind)
   announce(input: AnnounceInput): Promise<{ peers: Peer[]; room: RoomMeta }>;
   removePeer(roomId: string, peerId: string): Promise<void>;
   listPeers(roomId: string): Promise<Peer[]>;

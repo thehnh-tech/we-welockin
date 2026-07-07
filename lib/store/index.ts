@@ -11,6 +11,7 @@ const backend: StoreBackend = isRedisConfigured() ? redisBackend : memoryBackend
 
 export const getRoom = (id: string) => backend.getRoom(id);
 export const listActiveRooms = () => backend.listActiveRooms();
+export const countActivePeers = () => backend.countActivePeers();
 export const announce = (input: AnnounceInput) => backend.announce(input);
 export const removePeer = (roomId: string, peerId: string) =>
   backend.removePeer(roomId, peerId);

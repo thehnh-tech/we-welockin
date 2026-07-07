@@ -171,4 +171,20 @@ describe("memoryBackend", () => {
     const room = await memoryBackend.getRoom(id);
     expect(room?.visibility).toBe("public");
   });
+
+  it("counts active peers across all rooms, private included", async () => {
+    const before = await memoryBackend.countActivePeers();
+    const a = rid();
+    const b = rid();
+    await memoryBackend.announce({ roomId: a, peerId: "p1", username: "U1" });
+    await memoryBackend.announce({ roomId: a, peerId: "p2", username: "U2" });
+    await memoryBackend.announce({
+      roomId: b,
+      peerId: "p3",
+      username: "U3",
+      visibility: "private",
+    });
+    const after = await memoryBackend.countActivePeers();
+    expect(after - before).toBe(3);
+  });
 });

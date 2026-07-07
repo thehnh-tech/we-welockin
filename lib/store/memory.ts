@@ -112,6 +112,14 @@ export const memoryBackend: StoreBackend = {
       .map(toPublic);
   },
 
+  async countActivePeers() {
+    const now = Date.now();
+    cleanupAll(now);
+    let total = 0;
+    for (const room of store.rooms.values()) total += room.peers.size;
+    return total;
+  },
+
   async announce(input: AnnounceInput) {
     const now = Date.now();
     const roomId = sanitizeRoomId(input.roomId);
