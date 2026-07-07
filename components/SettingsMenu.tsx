@@ -213,6 +213,7 @@ export default function SettingsMenu({ pseudo, onPseudoChange, tone = "surface" 
             value={prefs.theme}
             options={[
               { key: "papier" as const, label: "Paper" },
+              { key: "gris" as const, label: "Gray" },
               { key: "encre" as const, label: "Ink" },
             ]}
             onChange={(v) => setPrefs({ theme: v })}

@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 // <html> (data attributes consumed by CSS variables) and notifies subscribers.
 
 export type Prefs = {
-  theme: "papier" | "encre"; // light paper / warm dark
+  theme: "papier" | "gris" | "encre"; // warm paper / neutral gray / warm dark
   accent: string; // accent key (see ACCENTS in lib/theme)
   timerStyle: "anneau" | "minimal";
   timerSeconds: boolean; // show seconds on the chrono
@@ -31,7 +31,7 @@ export const DEFAULT_PREFS: Prefs = {
 const KEY = "wlis_prefs_v1";
 const EVENT = "wlis-prefs-changed";
 
-const THEMES = new Set(["papier", "encre"]);
+const THEMES = new Set(["papier", "gris", "encre"]);
 const ACCENT_KEYS = new Set([
   "terracotta",
   "vert",

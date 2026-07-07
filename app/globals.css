@@ -9,14 +9,14 @@
    color transitions below.
 --------------------------------------------------------------------------- */
 :root {
-  /* Papier (default) — warm paper surfaces, brown inks. Toned down from the
-     original charter values: less glare, easier on the eyes. */
-  --wl-canvas: #e9e2d4;
-  --wl-surface: #f6f1e6;
-  --wl-card: #f1ebde;
-  --wl-cardalt: #f3eee2;
-  --wl-sunken: #e2dac9;
-  --wl-track: #d6cdba;
+  /* Papier (default) — light warm paper, dialed down on the brown: airy and
+     soft rather than beige-heavy. */
+  --wl-canvas: #edeae2;
+  --wl-surface: #faf8f3;
+  --wl-card: #f4f2ec;
+  --wl-cardalt: #f6f4ee;
+  --wl-sunken: #e6e2d8;
+  --wl-track: #d9d5c9;
 
   --wl-ink: #1a1714;
   --wl-ink2: #3a352d;
@@ -51,6 +51,42 @@
   --wl-accent: #e07856;
   --wl-accent-strong: #c25a3a; /* filled CTAs, focus rings — AA with paper text */
   --wl-accent-tint: #f5e4dd;
+}
+
+/* Gris — light neutral gray, the faintest warm tint so it never feels
+   clinical. For people who find the paper tones too brown. */
+[data-wl-theme="gris"] {
+  --wl-canvas: #e9e8e5;
+  --wl-surface: #f8f7f5;
+  --wl-card: #f2f1ee;
+  --wl-cardalt: #f4f3f1;
+  --wl-sunken: #e2e1dd;
+  --wl-track: #d5d4cf;
+
+  --wl-ink: #1c1b19;
+  --wl-ink2: #3b3936;
+  --wl-text2: #56534e;
+  --wl-text3: #74716a;
+  --wl-muted: #8a8680;
+  --wl-faint: #b1ada6;
+  --wl-placeholder: #c3c0b9;
+
+  --wl-hairline: rgba(28, 27, 25, 0.06);
+  --wl-line: rgba(28, 27, 25, 0.08);
+  --wl-strong: rgba(28, 27, 25, 0.12);
+
+  --wl-band: #201f1d;
+  --wl-band-2: #2a2926;
+  --wl-band-text: #f8f7f5;
+  --wl-band-text2: rgba(248, 247, 245, 0.74);
+  --wl-band-text3: rgba(248, 247, 245, 0.52);
+  --wl-band-line: rgba(248, 247, 245, 0.13);
+  --wl-band-chip: rgba(248, 247, 245, 0.08);
+  --wl-band-active: #f8f7f5;
+  --wl-band-active-text: #1c1b19;
+
+  --wl-scrollbar: #c9c7c2;
+  --wl-shadow-color: 28, 27, 25;
 }
 
 /* Encre — warm dark theme (never cold gray) */

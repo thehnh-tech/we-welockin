@@ -32,7 +32,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              'try{var p=JSON.parse(localStorage.getItem("wlis_prefs_v1")||"{}"),e=document.documentElement;e.dataset.wlTheme=["papier","encre"].indexOf(p.theme)>=0?p.theme:"papier";e.dataset.wlAccent=["terracotta","vert","bleu","violet","sarcelle","ambre"].indexOf(p.accent)>=0?p.accent:"terracotta";if(p.reducedMotion===true)e.classList.add("wl-reduce")}catch(e){}',
+              'try{var p=JSON.parse(localStorage.getItem("wlis_prefs_v1")||"{}"),e=document.documentElement;e.dataset.wlTheme=["papier","gris","encre"].indexOf(p.theme)>=0?p.theme:"papier";e.dataset.wlAccent=["terracotta","vert","bleu","violet","sarcelle","ambre"].indexOf(p.accent)>=0?p.accent:"terracotta";if(p.reducedMotion===true)e.classList.add("wl-reduce")}catch(e){}',
           }}
         />
       </head>
