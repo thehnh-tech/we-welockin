@@ -5,24 +5,13 @@ import { useRouter } from "next/navigation";
 import { getPseudo, setPseudo } from "@/lib/cookies";
 import { buildRoomUrl } from "@/lib/roomLink";
 import { generateRoomId, normalizeRoomCode } from "@/lib/roomCode";
-import { formatClock, formatShortDuration } from "@/lib/time";
+import { formatShortDuration } from "@/lib/time";
 import { getStreakDays, getTodaySeconds, getWeekSeconds } from "@/lib/stats";
 import { ROOMS_POLL_MS } from "@/lib/constants";
 import { usePrefs } from "@/lib/prefs";
 import Avatar from "@/components/Avatar";
 import Padlock from "@/components/Padlock";
 import SettingsMenu from "@/components/SettingsMenu";
-
-type RoomView = {
-  id: string;
-  name: string;
-  subject: string;
-  durationSec: number;
-  startedAt: number;
-  peerCount: number;
-  deep: boolean;
-  peerNames: string[];
-};
 
 const DAYS = [
   "Sunday",
@@ -50,17 +39,16 @@ export default function HomePage() {
   const prefs = usePrefs();
   const [pseudo, setPseudoState] = useState<string | null>(null);
   const [pseudoInput, setPseudoInput] = useState("");
-  const [rooms, setRooms] = useState<RoomView[]>([]);
+  // Marketing floor — the counter never looks empty (see /api/rooms).
+  const [activeUsers, setActiveUsers] = useState(130);
   const [newName, setNewName] = useState("");
   const [newSubject, setNewSubject] = useState("");
   const [presetMinutes, setPresetMinutes] = useState<number | "custom">(25);
-  const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [customMinutes, setCustomMinutes] = useState("45");
   const [codeInput, setCodeInput] = useState("");
   const [codeError, setCodeError] = useState(false);
   const [stats, setStats] = useState({ today: 0, week: 0, streak: 0 });
   const [greeting, setGreeting] = useState("");
-  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     setPseudoState(getPseudo());
@@ -73,35 +61,26 @@ export default function HomePage() {
     });
   }, []);
 
-  // Tick the live timers on the room rows.
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
   useEffect(() => {
     if (!pseudo) return;
     let alive = true;
-    const fetchRooms = async () => {
+    const fetchCount = async () => {
       if (document.visibilityState === "hidden") return;
       try {
         const res = await fetch("/api/rooms", { cache: "no-store" });
         const data = await res.json();
-        if (alive) setRooms(data.rooms ?? []);
+        if (alive && typeof data.activeUsers === "number") {
+          setActiveUsers(data.activeUsers);
+        }
       } catch {}
     };
-    fetchRooms();
-    const t = setInterval(fetchRooms, ROOMS_POLL_MS);
+    fetchCount();
+    const t = setInterval(fetchCount, ROOMS_POLL_MS);
     return () => {
       alive = false;
       clearInterval(t);
     };
   }, [pseudo]);
-
-  const liveCount = useMemo(
-    () => rooms.reduce((a, r) => a + r.peerCount, 0),
-    [rooms]
-  );
 
   // Resolved timer length in minutes, clamped in JS — no native validation
   // bubbles ("value must be less than or equal to…").
@@ -133,7 +112,7 @@ export default function HomePage() {
         durationSec,
         startedAt,
         subject: newSubject.trim() || undefined,
-        visibility,
+        visibility: "private",
       })
     );
   };
@@ -260,9 +239,18 @@ export default function HomePage() {
             <br />
             <span className="text-accent">lock in.</span>
           </h1>
-          <p className="mb-8 text-[15px] text-bandtext2">
-            Start a room or join a crew already studying.
+          <p className="mb-3 text-[15px] text-bandtext2">
+            Start a room or join your crew with a code.
           </p>
+          <div className="mb-8 flex items-center gap-2 text-[13px] font-semibold text-bandtext2">
+            <span
+              className="h-[7px] w-[7px] rounded-full animate-wl-live"
+              style={{ background: "#54a078" }}
+              aria-hidden="true"
+            />
+            <span className="tabular-nums">{activeUsers}</span> people locked
+            in right now
+          </div>
 
           <dl className="flex flex-wrap gap-x-10 gap-y-4">
             <div className="min-w-[110px]">
@@ -395,36 +383,10 @@ export default function HomePage() {
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <div
-                    className="flex gap-1 rounded-full bg-sunken p-1"
-                    role="radiogroup"
-                    aria-label="Room visibility"
-                  >
-                    {(["public", "private"] as const).map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        role="radio"
-                        aria-checked={visibility === v}
-                        onClick={() => setVisibility(v)}
-                        className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold capitalize transition-colors duration-200 ease-wl ${
-                          visibility === v
-                            ? "bg-ink text-surface shadow-xs"
-                            : "text-text2 hover:text-ink"
-                        }`}
-                      >
-                        {v}
-                      </button>
-                    ))}
-                  </div>
-                  <span className="text-xs text-text3">
-                    {visibility === "private"
-                      ? "Only people with the code can join."
-                      : "Shows up in Live rooms."}
-                  </span>
-                </div>
-
+                <p className="text-xs text-text3">
+                  Your room is private. Share the invite code once you&apos;re
+                  in.
+                </p>
                 <button
                   type="submit"
                   className="wl-lift mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-accentink px-5 py-[11px] text-sm font-bold shadow-sm"
@@ -494,101 +456,13 @@ export default function HomePage() {
                 </p>
               ) : (
                 <p className="mt-2 text-xs text-text3">
-                  Codes look like FOCUS-ABCDE. Private rooms can only be
-                  joined this way.
+                  Codes look like FOCUS-ABCDE — ask your crew for theirs.
                 </p>
               )}
             </form>
           </div>
         </div>
 
-        <div className="animate-wl-rise" style={{ animationDelay: ".1s" }}>
-          <div className="mb-3.5 flex items-center justify-between">
-            <h2
-              className="text-base font-bold text-ink"
-              style={{ letterSpacing: "-0.02em" }}
-            >
-              Live rooms
-            </h2>
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-text2">
-              <span
-                className="h-[7px] w-[7px] rounded-full animate-wl-live"
-                style={{ background: "#54a078" }}
-                aria-hidden="true"
-              />
-              {liveCount} studying now
-            </span>
-          </div>
-
-          {rooms.length === 0 ? (
-            <div className="rounded-[14px] border border-hairline bg-card px-5 py-8 text-center text-sm text-text3">
-              No live rooms right now. Start yours.
-            </div>
-          ) : (
-            <ul className="flex list-none flex-col gap-2.5 p-0">
-              {rooms.map((r) => {
-                const remaining = r.durationSec - (now - r.startedAt) / 1000;
-                return (
-                  <li
-                    key={r.id}
-                    className="wl-lift flex items-center gap-4 rounded-[14px] border border-hairline bg-surface p-3.5 px-4 shadow-xs max-[560px]:flex-wrap"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex items-center gap-2">
-                        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-semibold text-ink">
-                          {r.name}
-                        </span>
-                        {r.deep && (
-                          <span className="whitespace-nowrap rounded-full border border-hairline bg-sunken px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.06em] text-text2">
-                            Deep Focus
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <span className="rounded-full bg-sunken px-2 py-0.5 text-xs font-semibold text-text2 tabular-nums">
-                          {remaining > 0
-                            ? `Focus ${formatClock(remaining)}`
-                            : "Done"}
-                        </span>
-                        {r.subject && (
-                          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-text3">
-                            {r.subject}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3.5 max-[560px]:w-full max-[560px]:justify-between">
-                      <div className="flex items-center">
-                        {r.peerNames.map((name, i) => (
-                          <span key={`${name}-${i}`} className="-ml-2 first:ml-0">
-                            <Avatar
-                              username={name}
-                              size={30}
-                              rounded="50%"
-                              fontSize={11}
-                              ringColor="var(--wl-surface)"
-                            />
-                          </span>
-                        ))}
-                        <span className="ml-2 text-[13px] font-semibold text-text2 tabular-nums">
-                          {r.peerCount}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() =>
-                          router.push(`/room/${encodeURIComponent(r.id)}`)
-                        }
-                        className="rounded-full border border-strong bg-surface px-4 py-2 text-[13px] font-semibold text-ink transition-colors duration-200 ease-wl hover:bg-ink hover:text-surface"
-                      >
-                        Join
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
       </main>
     </div>
   );
