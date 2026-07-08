@@ -8,6 +8,7 @@ export type AccentDef = {
 };
 
 export const ACCENTS: AccentDef[] = [
+  { key: "red", label: "Red", swatch: "#e2483a" },
   { key: "terracotta", label: "Terracotta", swatch: "#e07856" },
   { key: "vert", label: "Green", swatch: "#54a078" },
   { key: "bleu", label: "Blue", swatch: "#5a7db8" },
