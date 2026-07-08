@@ -47,10 +47,10 @@
   --wl-scrollbar: #cbc2b0;
   --wl-shadow-color: 26, 23, 20;
 
-  /* Accent (terracotta by default; overridden by [data-wl-accent]) */
-  --wl-accent: #e07856;
-  --wl-accent-strong: #c25a3a; /* filled CTAs, focus rings — AA with paper text */
-  --wl-accent-tint: #f5e4dd;
+  /* Accent (red by default; overridden by [data-wl-accent]) */
+  --wl-accent: #e2483a;
+  --wl-accent-strong: #bd2f1e; /* filled CTAs, focus rings — AA with white text */
+  --wl-accent-tint: #f8ddd7;
 }
 
 /* Gris — light neutral gray, the faintest warm tint so it never feels
@@ -128,6 +128,11 @@
 }
 
 /* Accents — the strong variant is the filled/CTA color (AA with paper text) */
+[data-wl-accent="red"] {
+  --wl-accent: #e2483a;
+  --wl-accent-strong: #bd2f1e;
+  --wl-accent-tint: #f8ddd7;
+}
 [data-wl-accent="terracotta"] {
   --wl-accent: #e07856;
   --wl-accent-strong: #c25a3a;
@@ -157,6 +162,9 @@
   --wl-accent: #b08646;
   --wl-accent-strong: #8f6a2e;
   --wl-accent-tint: #f4e7d6;
+}
+[data-wl-theme="encre"][data-wl-accent="red"] {
+  --wl-accent-tint: #3a1c18;
 }
 [data-wl-theme="encre"][data-wl-accent="terracotta"] {
   --wl-accent-tint: #3c261e;

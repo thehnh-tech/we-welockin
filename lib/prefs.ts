@@ -19,7 +19,7 @@ export type Prefs = {
 
 export const DEFAULT_PREFS: Prefs = {
   theme: "papier",
-  accent: "terracotta",
+  accent: "red",
   timerStyle: "anneau",
   timerSeconds: true,
   sound: true,
@@ -33,6 +33,7 @@ const EVENT = "wlis-prefs-changed";
 
 const THEMES = new Set(["papier", "gris", "encre"]);
 const ACCENT_KEYS = new Set([
+  "red",
   "terracotta",
   "vert",
   "bleu",
@@ -48,7 +49,7 @@ export function getPrefs(): Prefs {
     const p = JSON.parse(raw);
     return {
       theme: THEMES.has(p.theme) ? p.theme : "papier",
-      accent: ACCENT_KEYS.has(p.accent) ? p.accent : "terracotta",
+      accent: ACCENT_KEYS.has(p.accent) ? p.accent : "red",
       timerStyle: p.timerStyle === "minimal" ? "minimal" : "anneau",
       timerSeconds: p.timerSeconds !== false,
       sound: p.sound !== false,
