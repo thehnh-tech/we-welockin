@@ -11,6 +11,7 @@ import {
   PEER_TIMEOUT_MS,
   ROOM_GRACE_MS,
   sanitizeDuration,
+  sanitizeInstitution,
   sanitizeName,
   sanitizePeerId,
   sanitizeRoomId,
@@ -77,6 +78,7 @@ function toPublic(room: MemRoom): RoomPublic {
     durationSec: room.durationSec,
     startedAt: room.startedAt,
     visibility: room.visibility,
+    institution: room.institution,
     peerCount: room.peers.size,
     deep: anyDeep(room),
     peerNames: Array.from(room.peers.values(), (p) => p.username).slice(0, 4),
@@ -91,6 +93,7 @@ function toMeta(room: MemRoom): RoomMeta {
     durationSec: room.durationSec,
     startedAt: room.startedAt,
     visibility: room.visibility,
+    institution: room.institution,
   };
 }
 
@@ -120,6 +123,29 @@ export const memoryBackend: StoreBackend = {
     return total;
   },
 
+  async createRoom(meta) {
+    const now = Date.now();
+    if (store.rooms.size >= MAX_ROOMS) cleanupAll(now);
+    const id = sanitizeRoomId(meta.id);
+    if (store.rooms.has(id)) return null;
+    const durationSec = sanitizeDuration(meta.durationSec);
+    const room: MemRoom = {
+      id,
+      name: sanitizeName(meta.name),
+      subject: sanitizeSubject(meta.subject),
+      durationSec,
+      startedAt: sanitizeStartedAt(meta.startedAt, durationSec, now),
+      visibility: sanitizeVisibility(meta.visibility),
+      institution: sanitizeInstitution(meta.institution),
+      peers: new Map(),
+      // Empty until the creator's first announce — the grace window keeps it
+      // alive meanwhile.
+      emptySince: now,
+    };
+    store.rooms.set(id, room);
+    return toMeta(room);
+  },
+
   async announce(input: AnnounceInput) {
     const now = Date.now();
     const roomId = sanitizeRoomId(input.roomId);
@@ -136,6 +162,7 @@ export const memoryBackend: StoreBackend = {
         durationSec,
         startedAt,
         visibility: sanitizeVisibility(input.visibility),
+        institution: sanitizeInstitution(input.institution),
         peers: new Map(),
         emptySince: null,
       };

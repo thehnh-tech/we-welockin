@@ -159,9 +159,21 @@ describe("memoryBackend", () => {
     expect(room?.peerCount).toBe(1);
   });
 
-  it("cannot flip a room private after creation", async () => {
+  it("defaults visibility to private (fail-closed)", async () => {
     const id = rid();
     await memoryBackend.announce({ roomId: id, peerId: "a", username: "A" });
+    const room = await memoryBackend.getRoom(id);
+    expect(room?.visibility).toBe("private");
+  });
+
+  it("cannot flip a room's visibility after creation", async () => {
+    const id = rid();
+    await memoryBackend.announce({
+      roomId: id,
+      peerId: "a",
+      username: "A",
+      visibility: "public",
+    });
     await memoryBackend.announce({
       roomId: id,
       peerId: "b",
@@ -170,6 +182,74 @@ describe("memoryBackend", () => {
     });
     const room = await memoryBackend.getRoom(id);
     expect(room?.visibility).toBe("public");
+  });
+
+  it("createRoom pre-creates an empty room and refuses a taken id", async () => {
+    const id = rid();
+    const meta = {
+      id,
+      name: "Feed room",
+      subject: "Chimie",
+      durationSec: 1500,
+      startedAt: Date.now(),
+      visibility: "public" as const,
+      institution: "Swiss Federal Institute of Technology, Lausanne",
+    };
+    expect(await memoryBackend.createRoom(meta)).toMatchObject({
+      id,
+      name: "Feed room",
+      visibility: "public",
+    });
+    expect(await memoryBackend.createRoom(meta)).toBeNull();
+
+    const room = await memoryBackend.getRoom(id);
+    expect(room?.visibility).toBe("public");
+    expect(room?.institution).toBe(meta.institution);
+    expect(room?.peerCount).toBe(0);
+
+    // The pre-created meta must survive the creator's first announce.
+    await memoryBackend.announce({
+      roomId: id,
+      peerId: "a",
+      username: "A",
+      name: "Hijacked",
+      visibility: "private",
+    });
+    const after = await memoryBackend.getRoom(id);
+    expect(after?.name).toBe("Feed room");
+    expect(after?.visibility).toBe("public");
+  });
+
+  it("createRoom returns the meta as stored, not as requested", async () => {
+    // The API route echoes this back to the creator and archives it, so a
+    // clamped duration or a defaulted name must not read back unclamped.
+    const stored = await memoryBackend.createRoom({
+      id: rid(),
+      name: "   ",
+      subject: "x".repeat(200),
+      durationSec: 9_999_999,
+      startedAt: Date.now(),
+      visibility: "public",
+      institution: "EPFL",
+    });
+    expect(stored?.durationSec).toBe(8 * 3600);
+    expect(stored?.name).toBe("Study session");
+    expect(stored?.subject.length).toBe(60);
+  });
+
+  it("empty pre-created public rooms stay off the feed until someone joins", async () => {
+    const id = rid();
+    await memoryBackend.createRoom({
+      id,
+      name: "Ghost",
+      subject: "",
+      durationSec: 1500,
+      startedAt: Date.now(),
+      visibility: "public",
+      institution: "X",
+    });
+    const listed = await memoryBackend.listActiveRooms();
+    expect(listed.find((r) => r.id === id)).toBeUndefined();
   });
 
   it("counts active peers across all rooms, private included", async () => {
