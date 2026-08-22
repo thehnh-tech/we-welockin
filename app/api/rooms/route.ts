@@ -34,11 +34,18 @@ export async function GET() {
   });
 }
 
-// Explicit room creation. Private rooms don't need this route (they are
-// created implicitly by the first announce); a PUBLIC room does, because only
-// a verified university email may put a room on the feed.
+// The ONLY way a room comes into existence. Ids are minted here, never
+// accepted from the caller: that is what stops someone from creating a room at
+// an id they read off the feed and waiting there for the people who return to
+// an old link. Rooms stay ephemeral — they still expire — but a dead link now
+// stays dead instead of quietly reopening as somebody else's room.
 export async function POST(req: NextRequest) {
-  if (!(await allowMutation(clientIp(req)))) return rateLimited();
+  const ip = clientIp(req);
+  if (!(await allowMutation(ip))) return rateLimited();
+  // A far tighter budget than other writes: room creation consumes a slot in
+  // the global MAX_ROOMS cap, so an unmetered creator could fill it and stop
+  // everyone else from starting a session.
+  if (!(await allowVerify(`rc:ip:${ip}`, 30, 3600))) return rateLimited();
 
   const body = await readJsonBody<{
     name?: unknown;
@@ -64,8 +71,9 @@ export async function POST(req: NextRequest) {
   }
 
   const now = Date.now();
-  // Per-creator ceiling: the cookie is the identity here, so one verified
-  // student cannot flood the feed (or the archive) from a single account.
+  // Per-creator ceiling on top of the per-IP one: the cookie is the identity
+  // here, so one verified student cannot flood the feed (or the archive) by
+  // moving between networks.
   if (creator && !(await allowVerify(`rc:em:${creator.email}`, 30, 3600, now))) {
     return rateLimited();
   }

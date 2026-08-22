@@ -248,33 +248,12 @@ export const redisBackend: StoreBackend = {
     const now = Date.now();
     const roomId = sanitizeRoomId(input.roomId);
 
-    let meta = parseMeta(roomId, await r.hgetall<RawMeta>(metaKey(roomId)), now);
-    if (!meta) {
-      const durationSec = sanitizeDuration(input.durationSec);
-      const startedAt = sanitizeStartedAt(input.startedAt, durationSec, now);
-      const name = sanitizeName(input.name);
-      const subject = sanitizeSubject(input.subject);
-      const visibility = sanitizeVisibility(input.visibility);
-      const institution = sanitizeInstitution(input.institution);
-      meta = {
-        id: roomId,
-        name,
-        subject,
-        durationSec,
-        startedAt,
-        visibility,
-        institution,
-      };
-      await r.hset(metaKey(roomId), {
-        name,
-        subject,
-        durationSec,
-        startedAt,
-        visibility,
-        institution,
-      });
-      await indexRoom(r, roomId, startedAt);
-    }
+    const meta = parseMeta(
+      roomId,
+      await r.hgetall<RawMeta>(metaKey(roomId)),
+      now
+    );
+    if (!meta) return null; // rooms are born only in createRoom
 
     const peerId = sanitizePeerId(input.peerId);
     const existingRaw = await r.hget(namesKey(roomId), peerId);

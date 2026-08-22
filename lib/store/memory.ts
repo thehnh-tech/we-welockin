@@ -150,25 +150,8 @@ export const memoryBackend: StoreBackend = {
   async announce(input: AnnounceInput) {
     const now = Date.now();
     const roomId = sanitizeRoomId(input.roomId);
-    let room = store.rooms.get(roomId);
-
-    if (!room) {
-      if (store.rooms.size >= MAX_ROOMS) cleanupAll(now);
-      const durationSec = sanitizeDuration(input.durationSec);
-      const startedAt = sanitizeStartedAt(input.startedAt, durationSec, now);
-      room = {
-        id: roomId,
-        name: sanitizeName(input.name),
-        subject: sanitizeSubject(input.subject),
-        durationSec,
-        startedAt,
-        visibility: sanitizeVisibility(input.visibility),
-        institution: sanitizeInstitution(input.institution),
-        peers: new Map(),
-        emptySince: null,
-      };
-      store.rooms.set(roomId, room);
-    }
+    const room = store.rooms.get(roomId);
+    if (!room) return null; // rooms are born only in createRoom
 
     const peerId = sanitizePeerId(input.peerId);
     cleanupRoom(room, now);

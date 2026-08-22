@@ -31,18 +31,13 @@ export type RoomPublic = RoomMeta & {
   peerNames: string[]; // up to 4, for the stacked avatars on the feed cards
 };
 
+// Announcing is PRESENCE ONLY. A room's identity — name, timer, visibility,
+// institution — is fixed when it is created and is never carried on a
+// heartbeat, so there is nothing here for a client to lie about.
 export type AnnounceInput = {
   roomId: string;
   peerId: string;
   username: string;
-  name?: string;
-  subject?: string;
-  durationSec?: number;
-  startedAt?: number;
-  visibility?: string;
-  // Server-side only: filled from the verified-university cookie by the API
-  // route, never from the request body.
-  institution?: string;
   status?: Partial<PeerStatus> & { tint?: string };
 };
 
@@ -58,12 +53,18 @@ export interface StoreBackend {
   // that differ from what everyone else will read, or null when the id is
   // already taken so the caller can regenerate.
   createRoom(meta: RoomMeta): Promise<RoomMeta | null>;
+  // Presence heartbeat for an EXISTING room. Returns null when the room does
+  // not exist (or has expired): rooms are born only through createRoom, so a
+  // heartbeat can never conjure one at an id of the caller's choosing, and a
+  // dead room's link stays dead instead of quietly reopening as someone
+  // else's room.
+  //
   // `joined` is false when the room was already full and this peer is NOT a
   // member — the caller turns that into a visible "room is full" answer
   // instead of letting someone sit in a room nobody can see them in.
   announce(
     input: AnnounceInput
-  ): Promise<{ peers: Peer[]; room: RoomMeta; joined: boolean }>;
+  ): Promise<{ peers: Peer[]; room: RoomMeta; joined: boolean } | null>;
   removePeer(roomId: string, peerId: string): Promise<void>;
   listPeers(roomId: string): Promise<Peer[]>;
 }

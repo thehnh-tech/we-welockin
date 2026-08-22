@@ -214,44 +214,19 @@ export const mongoBackend: StoreBackend = {
     const db = await getDb();
     const now = Date.now();
     const roomId = sanitizeRoomId(input.roomId);
-    const durationSec = sanitizeDuration(input.durationSec);
 
     // Refresh the TTL of a room that is still LIVE. The expiresAt predicate
-    // matters: Mongo's TTL monitor sweeps only about once a minute, so without
-    // it an announce landing in that window would revive a dead room's
-    // metadata — including its "public" visibility and the departed creator's
-    // institution — putting an abandoned session back on the feed. Redis and
-    // memory both hand out a fresh room there, so this keeps the three
-    // backends in agreement.
+    // matters: Mongo's TTL monitor sweeps only about once a minute, so a doc
+    // can outlive its expiry — without the predicate a heartbeat landing in
+    // that window would revive a dead room's metadata, including its "public"
+    // visibility and the departed creator's institution.
     const aliveDoc = await roomsCol(db).findOneAndUpdate(
       { _id: roomId, expiresAt: { $gt: new Date(now) } },
       { $set: { expiresAt: roomTtl(now) } },
       { returnDocument: "after" }
     );
-
-    let meta: RoomMeta;
-    if (aliveDoc) {
-      meta = docToMeta(aliveDoc as RoomDoc, now);
-    } else {
-      // Missing, or expired-but-unswept: start over from this announce.
-      meta = {
-        id: roomId,
-        name: sanitizeName(input.name),
-        subject: sanitizeSubject(input.subject),
-        durationSec,
-        startedAt: sanitizeStartedAt(input.startedAt, durationSec, now),
-        visibility: sanitizeVisibility(input.visibility),
-        institution: sanitizeInstitution(input.institution),
-      };
-      await roomsCol(db).replaceOne(
-        { _id: roomId },
-        { ...toDoc(meta), expiresAt: roomTtl(now) },
-        { upsert: true }
-      );
-      // Drop the dead session's leftover presence rows so the new room does
-      // not inherit ghosts.
-      await peersCol(db).deleteMany({ roomId });
-    }
+    if (!aliveDoc) return null; // rooms are born only in createRoom
+    const meta = docToMeta(aliveDoc as RoomDoc, now);
 
     const peerId = sanitizePeerId(input.peerId);
     const existing = await peersCol(db).findOne({ roomId, peerId });
