@@ -33,8 +33,15 @@ export function sanitizeSubject(subject: string | undefined): string {
   return (subject ?? "").toString().replace(CONTROL_CHARS, "").trim().slice(0, 60);
 }
 
+// Fail-closed: anything that isn't explicitly "public" is private. The API
+// routes only pass "public" after checking the verified-university cookie.
 export function sanitizeVisibility(v: unknown): "public" | "private" {
-  return v === "private" ? "private" : "public";
+  return v === "public" ? "public" : "private";
+}
+
+// University display name, set server-side from the verified cookie.
+export function sanitizeInstitution(v: unknown): string {
+  return (v ?? "").toString().replace(CONTROL_CHARS, "").trim().slice(0, 120);
 }
 
 const TINT_KEYS = new Set([

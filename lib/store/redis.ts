@@ -14,6 +14,7 @@ import {
   PEER_TIMEOUT_MS,
   ROOM_TTL_SEC,
   sanitizeDuration,
+  sanitizeInstitution,
   sanitizeName,
   sanitizePeerId,
   sanitizeRoomId,
@@ -51,6 +52,7 @@ type RawMeta = {
   durationSec?: unknown;
   startedAt?: unknown;
   visibility?: unknown;
+  institution?: unknown;
 };
 
 type PeerEntry = {
@@ -70,6 +72,7 @@ function parseMeta(id: string, raw: RawMeta | null, now: number): RoomMeta | nul
     durationSec,
     startedAt: Number.isFinite(startedAt) ? startedAt : now,
     visibility: sanitizeVisibility(raw.visibility),
+    institution: raw.institution != null ? String(raw.institution) : "",
   };
 }
 
@@ -142,6 +145,15 @@ function anyDeep(peers: Peer[]): boolean {
   return peers.some((p) => p.status.deep);
 }
 
+// Always index the room, then trim the index to the MAX_ROOMS most recent.
+// Skipping the insert at the cap instead would silently make a freshly created
+// public room undiscoverable — created, joinable, but never on the feed.
+// Trimming drops the OLDEST entries, whose metadata has usually expired anyway.
+async function indexRoom(r: Redis, id: string, startedAt: number) {
+  await r.zadd(INDEX, { score: startedAt, member: id });
+  await r.zremrangebyrank(INDEX, 0, -(MAX_ROOMS + 1));
+}
+
 function publicView(meta: RoomMeta, peers: Peer[]): RoomPublic {
   return {
     ...meta,
@@ -202,6 +214,34 @@ export const redisBackend: StoreBackend = {
     return total;
   },
 
+  async createRoom(inputMeta) {
+    const r = redis();
+    const now = Date.now();
+    const id = sanitizeRoomId(inputMeta.id);
+    if (await r.exists(metaKey(id))) return null;
+    const durationSec = sanitizeDuration(inputMeta.durationSec);
+    const meta: RoomMeta = {
+      id,
+      name: sanitizeName(inputMeta.name),
+      subject: sanitizeSubject(inputMeta.subject),
+      durationSec,
+      startedAt: sanitizeStartedAt(inputMeta.startedAt, durationSec, now),
+      visibility: sanitizeVisibility(inputMeta.visibility),
+      institution: sanitizeInstitution(inputMeta.institution),
+    };
+    await r.hset(metaKey(id), {
+      name: meta.name,
+      subject: meta.subject,
+      durationSec: meta.durationSec,
+      startedAt: meta.startedAt,
+      visibility: meta.visibility,
+      institution: meta.institution,
+    });
+    await r.expire(metaKey(id), ROOM_TTL_SEC);
+    await indexRoom(r, id, meta.startedAt);
+    return meta;
+  },
+
   async announce(input: AnnounceInput) {
     const r = redis();
     const now = Date.now();
@@ -214,18 +254,25 @@ export const redisBackend: StoreBackend = {
       const name = sanitizeName(input.name);
       const subject = sanitizeSubject(input.subject);
       const visibility = sanitizeVisibility(input.visibility);
-      meta = { id: roomId, name, subject, durationSec, startedAt, visibility };
+      const institution = sanitizeInstitution(input.institution);
+      meta = {
+        id: roomId,
+        name,
+        subject,
+        durationSec,
+        startedAt,
+        visibility,
+        institution,
+      };
       await r.hset(metaKey(roomId), {
         name,
         subject,
         durationSec,
         startedAt,
         visibility,
+        institution,
       });
-      const roomCount = await r.zcard(INDEX);
-      if (roomCount < MAX_ROOMS) {
-        await r.zadd(INDEX, { score: startedAt, member: roomId });
-      }
+      await indexRoom(r, roomId, startedAt);
     }
 
     const peerId = sanitizePeerId(input.peerId);

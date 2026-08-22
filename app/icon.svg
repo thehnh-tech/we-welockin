@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- welock.in — the fez peeking over the wall (brand logo, favicon cut) -->
+  <rect width="128" height="128" rx="24" fill="#f6ecdf"/>
+  <!-- fez -->
+  <path d="M30 57 L40 14 Q41.5 8 48 8 L85 5 Q91.5 4.6 93 11 L102 53 Q86 61 66 61 Q44 61 30 57 Z"
+        fill="#d3271c" stroke="#191410" stroke-width="5" stroke-linejoin="round"/>
+  <!-- tassel: cord down the right side, braid knots, loose strands -->
+  <path d="M88 8 C97 15 99.5 28 100 43" fill="none" stroke="#191410" stroke-width="6" stroke-linecap="round"/>
+  <ellipse cx="97.6" cy="22" rx="4.6" ry="6" fill="#191410" transform="rotate(-8 97.6 22)"/>
+  <ellipse cx="99.6" cy="34" rx="4.6" ry="6" fill="#191410" transform="rotate(-4 99.6 34)"/>
+  <path d="M100 43 L110 56 M100 44 L104 58 M99 44 L97 58" fill="none" stroke="#191410" stroke-width="4" stroke-linecap="round"/>
+  <!-- head sides peeking below the fez -->
+  <path d="M34 59 Q29 76 31 92" fill="none" stroke="#191410" stroke-width="5" stroke-linecap="round"/>
+  <path d="M97 57 Q102 75 100 92" fill="none" stroke="#191410" stroke-width="5" stroke-linecap="round"/>
+  <!-- brows -->
+  <path d="M44 68 Q52 62 59 67" fill="none" stroke="#191410" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M71 67 Q78 62 86 68" fill="none" stroke="#191410" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- eyes -->
+  <ellipse cx="52" cy="81" rx="4.5" ry="7" fill="#191410"/>
+  <ellipse cx="78" cy="81" rx="4.5" ry="7" fill="#191410"/>
+  <!-- hands gripping the wall -->
+  <path d="M16 94 A 9.5 9.5 0 0 1 35 94" fill="#f6ecdf" stroke="#191410" stroke-width="5" stroke-linecap="round"/>
+  <path d="M93 94 A 9.5 9.5 0 0 1 112 94" fill="#f6ecdf" stroke="#191410" stroke-width="5" stroke-linecap="round"/>
+  <!-- the wall -->
+  <path d="M8 94 L120 94" fill="none" stroke="#191410" stroke-width="5.5" stroke-linecap="round"/>
+</svg>

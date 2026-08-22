@@ -333,6 +333,29 @@ function RoomInner() {
             >
               {room?.name ?? ""}
             </span>
+            {room?.visibility === "public" && room.institution && (
+              <span
+                className="hidden shrink-0 items-center gap-1.5 rounded-full border border-bandline bg-bandchip px-2.5 py-1 text-[11px] font-semibold text-bandtext2 md:flex"
+                title={room.institution}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.9"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M22 10L12 5 2 10l10 5 10-5zM6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5" />
+                </svg>
+                <span className="max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">
+                  {room.institution}
+                </span>
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 rounded-[11px] border border-bandline bg-bandchip py-[6px] pl-[13px] pr-[8px]">

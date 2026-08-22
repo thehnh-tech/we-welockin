@@ -9,14 +9,17 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:domains": "node scripts/build-university-domains.mjs"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",
+    "mongodb": "^7.5.0",
     "next": "16.2.9",
     "peerjs": "1.5.4",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "resend": "^6.22.0"
   },
   "devDependencies": {
     "@types/node": "20.14.10",

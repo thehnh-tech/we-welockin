@@ -111,11 +111,11 @@ describe("sanitizeStatus", () => {
 });
 
 describe("sanitizeVisibility", () => {
-  it("only accepts the exact private value", () => {
+  it("fails closed: only the exact public value is public", () => {
     expect(sanitizeVisibility("private")).toBe("private");
     expect(sanitizeVisibility("public")).toBe("public");
-    expect(sanitizeVisibility("PRIVATE")).toBe("public");
-    expect(sanitizeVisibility(undefined)).toBe("public");
-    expect(sanitizeVisibility(1)).toBe("public");
+    expect(sanitizeVisibility("PUBLIC")).toBe("private");
+    expect(sanitizeVisibility(undefined)).toBe("private");
+    expect(sanitizeVisibility(1)).toBe("private");
   });
 });

@@ -7,6 +7,7 @@ export type RoomMeta = {
   durationSec: number;
   startedAt: number;
   visibility: "public" | "private";
+  institution: string; // "" when none / when meta came from deep-link params
 };
 
 // Resolve room metadata: trust the deep-link params first, otherwise ask the
@@ -32,7 +33,7 @@ export function useRoomMeta(
       fromUrl = parseRoomParams({ n, d, s, sub, p });
     } catch {}
     if (fromUrl) {
-      setRoom(fromUrl);
+      setRoom({ ...fromUrl, institution: "" });
       return;
     }
 
@@ -56,6 +57,10 @@ export function useRoomMeta(
             startedAt: data.room.startedAt,
             visibility:
               data.room.visibility === "private" ? "private" : "public",
+            institution:
+              typeof data.room.institution === "string"
+                ? data.room.institution
+                : "",
           });
         }
       } catch {

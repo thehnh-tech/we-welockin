@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { allowMutation, announce, listPeers, removePeer } from "@/lib/store";
+import { VERIFIED_COOKIE, verifyVerifiedToken } from "@/lib/verify/token";
+import { clientIp, rateLimited, readJsonBody } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const MAX_BODY_BYTES = 4096;
-
-function clientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
-}
 
 // Public view: usernames only. peerId / status / joinedAt are reserved for
 // members (they get the full list from their own announce response) — exposing
@@ -32,16 +28,9 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  if (!(await allowMutation(clientIp(req)))) {
-    return NextResponse.json({ error: "Rate limited" }, { status: 429 });
-  }
+  if (!(await allowMutation(clientIp(req)))) return rateLimited();
 
-  const rawBody = await req.text();
-  if (rawBody.length > MAX_BODY_BYTES) {
-    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
-  }
-
-  let body: {
+  const body = await readJsonBody<{
     peerId?: string;
     username?: string;
     name?: string;
@@ -50,30 +39,39 @@ export async function POST(
     startedAt?: number;
     visibility?: string;
     status?: { muted?: boolean; away?: boolean; deep?: boolean };
-  };
-  try {
-    body = JSON.parse(rawBody);
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  }>(req, MAX_BODY_BYTES);
+  if (!body.ok) return body.response;
 
-  const peerId = (body.peerId ?? "").toString();
+  const peerId = (body.value.peerId ?? "").toString();
   if (!peerId) {
     return NextResponse.json({ error: "peerId required" }, { status: 400 });
+  }
+
+  // The first announce creates the room, so "public" here is a creation
+  // request for the feed: only honored with a verified-university cookie
+  // (whose institution then labels the room). Anything else lands private.
+  // Rooms pre-created via POST /api/rooms keep their stored meta regardless.
+  let visibility = body.value.visibility;
+  let institution: string | undefined;
+  if (visibility === "public") {
+    const token = verifyVerifiedToken(req.cookies.get(VERIFIED_COOKIE)?.value);
+    if (token) institution = token.institution;
+    else visibility = "private";
   }
 
   const { peers, room } = await announce({
     roomId: id,
     peerId,
-    username: (body.username ?? "").toString(),
-    name: body.name,
-    subject: body.subject,
-    durationSec: body.durationSec,
-    startedAt: body.startedAt,
-    visibility: body.visibility,
-    status: body.status,
+    username: (body.value.username ?? "").toString(),
+    name: body.value.name,
+    subject: body.value.subject,
+    durationSec: body.value.durationSec,
+    startedAt: body.value.startedAt,
+    visibility,
+    institution,
+    status: body.value.status,
   });
-  // `room` is already the public meta shape { id, name, durationSec, startedAt }.
+  // `room` is already the public meta shape.
   return NextResponse.json({ peers, room });
 }
 

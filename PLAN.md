@@ -281,3 +281,105 @@ en live mesurée au DOM, timer Minimal/« 25 min » vérifiés, room en zones en
 ## Sprint 1 suggéré (≈ 1 semaine)
 Phase 0 + Phase 1 + Phase 2 → l'app devient **réellement fonctionnelle en prod**, plus rapide,
 typée, accessible, et sans les deux bugs visibles. C'est le meilleur rapport valeur/effort.
+
+---
+
+## Phase 8 — Feed public + vérification universitaire (Resend/MongoDB) ✅ FAIT
+
+**Objectif :** réintroduire les rooms publiques sous forme de **feed**, mais gatées : seule une
+personne vérifiée avec un **email universitaire** peut en créer une. Les rooms privées restent
+inchangées (code/lien, zéro friction).
+
+- [x] **Dataset universitaire** — `scripts/build-university-domains.mjs` génère
+      `lib/university/domains.json` (7 738 domaines → nom d'établissement) depuis
+      github.com/glean/university-email-domains (`npm run build:domains`). Lecture via
+      `git cat-file` sans checkout (le dataset contient un domaine `nul.ls`, nom réservé Windows).
+      Matching sous-domaines (`student.epfl.ch` → `epfl.ch`) + rejet des fournisseurs perso.
+- [x] **Vérification OTP par email (Resend)** — `POST /api/verify/request` (code 6 chiffres,
+      hash sha256 lié à email+secret, TTL 10 min, cooldown 60 s, rate-limits IP/email) →
+      `POST /api/verify/confirm` (5 essais max, comparaison constant-time) → cookie httpOnly
+      signé HMAC-SHA256 (30 j, `AUTH_SECRET`). `GET/DELETE /api/verify/status`. Sans clé Resend
+      en dev : code loggé dans la console serveur.
+- [x] **MongoDB** — client caché (`lib/db/mongo.ts`), index TTL. Collections : `verifications`,
+      `verified_emails`, `institution_requests`, `rate_limits`, `public_sessions` (archive du
+      feed), + `rooms`/`room_peers` pour le **3ᵉ backend de store** (`lib/store/mongo.ts`).
+      Sélection : Redis > Mongo > mémoire.
+- [x] **Gating serveur des rooms publiques** — `sanitizeVisibility` passe **fail-closed**
+      (défaut `private`). `POST /api/rooms` (création publique explicite) exige le cookie ;
+      le chemin announce force `private` sans cookie valide et n'accepte jamais l'institution
+      depuis le body.
+- [x] **Feed public sur la home** — poll `GET /api/rooms` → `{ activeUsers, rooms }` ; cartes
+      (nom, sujet, badge institution, avatars, « n locked in », temps restant, Deep Focus).
+      Toggle Private/Public feed dans le formulaire + panneau de vérification inline + badge
+      « Verified student ». Badge institution dans le header de room publique.
+- [x] **Request an institution** — CTA quand le domaine est inconnu → `POST
+      /api/institutions/request` → MongoDB + email admin via Resend (`INSTITUTION_REQUESTS_TO`).
+- [x] **Favicon** — logo fez recréé en SVG (`app/icon.svg`) + `favicon.ico` (16/32/48),
+      `apple-icon.png`, `public/icon-192|512.png` (générés via resvg).
+- [x] **SEO** — metadata complète (`metadataBase`, OG/Twitter, canonical, template de titre),
+      `robots.ts` (disallow `/api/`, `/room/`), `sitemap.ts`, `manifest.ts` (PWA),
+      `opengraph-image.tsx` (carte sociale générée), JSON-LD `WebApplication`, `noindex` sur
+      les rooms, `themeColor` clair/sombre.
+- [x] **Tests** — matching universitaire, tokens signés (falsification/expiration), OTP,
+      sanitize fail-closed, `createRoom` (anti-hijack, feed sans pairs masqué).
+
+**Env nouvelles :** `MONGODB_URI`, `MONGODB_DB`, `RESEND_API_KEY`, `RESEND_FROM`,
+`INSTITUTION_REQUESTS_TO`, `AUTH_SECRET` (requis en prod), `NEXT_PUBLIC_SITE_URL`.
+
+### Revue adversariale (26 agents) et correctifs — tous appliqués ✅
+
+22 findings bruts, 18 confirmés après vérification contradictoire, 4 réfutés. Corrigés :
+
+- [x] **[HIGH] Course sur le compteur de tentatives OTP** — `getCode` + `bumpAttempts`
+      était un *check-then-act* : N requêtes concurrentes lisaient le même compteur, passaient
+      toutes le plafond et permettaient de forcer le code à 6 chiffres. Remplacé par
+      `claimAttempt()` **atomique** (`findOneAndUpdate`+`$inc` côté Mongo, read-modify-write
+      synchrone en mémoire) : la tentative est dépensée *avant* la comparaison. Vérifié en
+      conditions réelles (20 requêtes parallèles → exactement 5 comparaisons, `attemptsLeft`
+      4/3/2/1/0 distincts, code brûlé). Test de non-régression ajouté. Plafond par email
+      ajouté sur `/confirm` (le plafond par IP dépend de la confiance dans `X-Forwarded-For`).
+- [x] **[HIGH] `robots.txt` annulait le `noindex` des rooms** — interdire `/room/` empêche le
+      crawler de *voir* le noindex (URL indexable nue) et bloque les bots de prévisualisation
+      (X, Slack, LinkedIn) sur le mécanisme d'invitation. `/room/` est désormais crawlable ;
+      le `noindex` fait le travail.
+- [x] **[MEDIUM] Canonical racine hérité par toutes les routes** — les rooms (noindex)
+      canonisaient vers la home. `canonical`/`og:url` déplacés par route : `app/page.tsx`
+      devient un composant serveur (UI en `components/HomeView.tsx`), la room a son propre
+      `og:url`. Image OG déclarée explicitement (`OG_BASE`) — la convention de fichier ne
+      l'attache qu'à son segment, la carte des rooms partait sans visuel.
+- [x] **[MEDIUM] Mongo ressuscitait les rooms expirées** — `announce` n'filtrait pas sur
+      `expiresAt` ; dans la fenêtre de balayage TTL (~60 s) une session morte revenait sur le
+      feed avec l'institution de son créateur absent. Aligné sur Redis/mémoire (room fraîche).
+- [x] **[MEDIUM] `POST /api/rooms` renvoyait la meta brute** — `createRoom` retourne
+      désormais la meta **stockée** (clampée/assainie), utilisée pour la réponse et l'archive.
+      `durationSec` absent → défaut 1500 s comme sur le chemin announce (et non 0 → 60 s).
+- [x] **[MEDIUM] Archive `public_sessions` sans TTL** + pas de plafond de rooms côté Mongo —
+      index TTL (180 j), `MAX_ROOMS` appliqué, et quota de création par compte vérifié.
+- [x] **[MEDIUM] Cooldown de renvoi bloquant** — le compte à rebours est lié à l'adresse sur
+      laquelle il a été gagné (le serveur limite par email) : corriger une faute de frappe
+      réactive le bouton immédiatement, et l'attente est désormais affichée (« Wait 42s »).
+- [x] **[MEDIUM] 76 noms d'établissements contenaient `&amp;`** — décodage des entités HTML
+      dans le script de build, dataset régénéré (test de non-régression).
+- [x] **[LOW] `mmu.ac.ke` silencieusement perdu** — le script clé désormais les domaines sur
+      le **nom de fichier** (autoritatif) et journalise collisions/incohérences amont.
+      7 739 domaines (au lieu de 7 738).
+- [x] **[LOW] Chip institution invisible pour le créateur** — une room publique navigue vers
+      l'URL **nue** : la page interroge le serveur, qui seul connaît l'institution (les
+      deep-links ne peuvent pas la porter).
+- [x] **[LOW] Redis : rooms publiques indiscoverables au plafond** — l'index est toujours
+      alimenté puis tronqué aux `MAX_ROOMS` plus récentes (au lieu d'un échec silencieux).
+- [x] **[LOW] Entrée clavier contournant le contrôle des 6 chiffres** + erreur générique →
+      garde dans `confirm()` et message dédié.
+- [x] **[LOW] Radiogroups** — badge « Verified student » et champ minutes sortis du groupe
+      ARIA ; navigation aux flèches + roving tabindex (helper `components/radioPills.ts`),
+      appliqués aussi au groupe « Timer length » préexistant.
+- [x] **[LOW] Poll du feed appliquant des réponses périmées** — séquencement monotone.
+- [x] **[LOW] Textes** — le feed vide explique comment atteindre le panneau de vérification ;
+      README aligné sur le rate-limiting réel (Redis **ou** Mongo).
+
+Réfutés (non corrigés, à raison) : spoof `X-Forwarded-For` (exploit non tenable seul),
+rate-limit fail-open (conséquence surestimée), course sur `ensureIndexes`, `lastModified`
+du sitemap.
+
+**État final :** `tsc --noEmit` ✅ · `eslint` ✅ (0 erreur, 7 warnings préexistants) ·
+**99 tests** ✅ · `next build` ✅.
