@@ -244,7 +244,12 @@ export const mongoBackend: StoreBackend = {
 
     const peerId = sanitizePeerId(input.peerId);
     const existing = await peersCol(db).findOne({ roomId, peerId });
-    if (existing && guard && !guard.peerTokenValid) {
+    // "taken" only defends a LIVE seat (see the Redis backend): a dead entry
+    // is usually our own first announce whose response was lost, and must be
+    // reclaimable without a token.
+    const liveMember =
+      !!existing && existing.lastSeen > now - PEER_TIMEOUT_MS;
+    if (liveMember && guard && !guard.peerTokenValid) {
       return { peers: [], room: meta, joined: false, refused: "taken" as const };
     }
 

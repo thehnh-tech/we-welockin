@@ -153,8 +153,11 @@ async function readPeers(id: string, now: number): Promise<Peer[]> {
 
   const { live, stale } = splitLive(raw, now);
   if (stale.length) {
+    // Drop them from the presence set, but KEEP their names-hash entry: that
+    // entry is the seat claim, and deleting it would let anyone re-announce a
+    // briefly-absent member's peer id and be handed their token. The hash
+    // carries the room's TTL, so it cannot outlive the session.
     await r.zrem(peersKey(id), ...stale);
-    await r.hdel(namesKey(id), ...stale);
   }
   if (live.length === 0) return [];
 
@@ -421,12 +424,13 @@ export const redisBackend: StoreBackend = {
     const roomId = sanitizeRoomId(input.roomId);
     const peerId = sanitizePeerId(input.peerId);
 
-    // 1: room meta + our previous entry, together.
+    // 1: room meta + our previous entry (and its liveness), together.
     const readPipe = r.pipeline();
     readPipe.hgetall(metaKey(roomId));
     readPipe.hget(namesKey(roomId), peerId);
-    const [rawMeta, existingRaw] = await readPipe.exec<
-      [RawMeta | null, unknown]
+    readPipe.zscore(peersKey(roomId), peerId);
+    const [rawMeta, existingRaw, existingScore] = await readPipe.exec<
+      [RawMeta | null, unknown, number | null]
     >();
 
     const meta = parseMeta(roomId, rawMeta, now);
@@ -438,7 +442,17 @@ export const redisBackend: StoreBackend = {
       return { peers: [], room: meta, joined: false, refused: "verification" as const };
     }
     const alreadyMember = existingRaw !== null && existingRaw !== undefined;
-    if (alreadyMember && guard && !guard.peerTokenValid) {
+    // "taken" only defends a LIVE seat. An entry whose heartbeats stopped is
+    // an orphan, and the commonest orphan is our own: first announce seats
+    // us server-side but the response is lost, so the retry arrives with no
+    // token. Refusing on the dead entry would lock that user out until
+    // someone else's seat script purges it — or kill a solo room outright.
+    const liveMember =
+      alreadyMember &&
+      existingScore !== null &&
+      existingScore !== undefined &&
+      now - Number(existingScore) <= PEER_TIMEOUT_MS;
+    if (liveMember && guard && !guard.peerTokenValid) {
       return { peers: [], room: meta, joined: false, refused: "taken" as const };
     }
 
