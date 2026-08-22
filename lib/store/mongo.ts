@@ -13,6 +13,7 @@
 import type { Collection, Db } from "mongodb";
 import { getDb } from "@/lib/db/mongo";
 import type {
+  AnnounceGuard,
   AnnounceInput,
   Peer,
   RoomMeta,
@@ -219,26 +220,40 @@ export const mongoBackend: StoreBackend = {
     }
   },
 
-  async announce(input: AnnounceInput) {
+  async announce(input: AnnounceInput, guard?: AnnounceGuard) {
     const db = await getDb();
     const now = Date.now();
     const roomId = sanitizeRoomId(input.roomId);
 
-    // Refresh the TTL of a room that is still LIVE. The expiresAt predicate
-    // matters: Mongo's TTL monitor sweeps only about once a minute, so a doc
-    // can outlive its expiry — without the predicate a heartbeat landing in
-    // that window would revive a dead room's metadata, including its "public"
-    // visibility and the departed creator's institution.
-    const aliveDoc = await roomsCol(db).findOneAndUpdate(
-      { _id: roomId, expiresAt: { $gt: new Date(now) } },
-      { $set: { expiresAt: roomTtl(now) } },
-      { returnDocument: "after" }
-    );
+    // Read WITHOUT refreshing first: a refused caller (unverified on a public
+    // room, or an id it cannot prove) must not keep the room alive. The
+    // expiresAt predicate matters: Mongo's TTL monitor sweeps only about once
+    // a minute, so a doc can outlive its expiry — without it a heartbeat
+    // landing in that window would revive a dead room's metadata, including
+    // its "public" visibility and the departed creator's institution.
+    const aliveDoc = await roomsCol(db).findOne({
+      _id: roomId,
+      expiresAt: { $gt: new Date(now) },
+    });
     if (!aliveDoc) return null; // rooms are born only in createRoom
-    const meta = docToMeta(aliveDoc as RoomDoc, now);
+    const meta = docToMeta(aliveDoc, now);
+
+    if (guard && meta.visibility === "public" && !guard.callerVerified) {
+      return { peers: [], room: meta, joined: false, refused: "verification" as const };
+    }
 
     const peerId = sanitizePeerId(input.peerId);
     const existing = await peersCol(db).findOne({ roomId, peerId });
+    if (existing && guard && !guard.peerTokenValid) {
+      return { peers: [], room: meta, joined: false, refused: "taken" as const };
+    }
+
+    // Legitimate caller: NOW refresh the room's TTL.
+    await roomsCol(db).updateOne(
+      { _id: roomId, expiresAt: { $gt: new Date(now) } },
+      { $set: { expiresAt: roomTtl(now) } }
+    );
+
     const liveCount = await peersCol(db).countDocuments({
       roomId,
       lastSeen: { $gt: now - PEER_TIMEOUT_MS },

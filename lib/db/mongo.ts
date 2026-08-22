@@ -20,7 +20,14 @@ export async function getDb(): Promise<Db> {
   const uri = process.env.MONGODB_URI;
   if (!uri) throw new Error("MONGODB_URI is not set");
   if (!g.__wlisMongo) {
-    const client = new MongoClient(uri, { serverSelectionTimeoutMS: 5000 });
+    // Small pool: the driver's default of 100 is per PROCESS, and serverless
+    // scale-out multiplies it — a handful of busy instances would exhaust a
+    // free-tier Atlas cluster's 500-connection cap on their own.
+    const client = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 10,
+      maxIdleTimeMS: 60_000,
+    });
     g.__wlisMongo = { clientPromise: client.connect(), indexesEnsured: false };
   }
   const client = await g.__wlisMongo.clientPromise;

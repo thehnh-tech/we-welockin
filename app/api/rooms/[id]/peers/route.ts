@@ -3,8 +3,6 @@ import {
   allowHeartbeat,
   allowMutation,
   announce,
-  getRoom,
-  listPeers,
   removePeer,
 } from "@/lib/store";
 import { ROOM_CAPACITY, sanitizeRoomId } from "@/lib/store/sanitize";
@@ -56,50 +54,43 @@ export async function POST(
     : await allowMutation(clientIp(req));
   if (!allowed) return rateLimited(10);
 
-  // A public room is listed for the whole internet, so its door is the
-  // university check — the same one that gates creating it. A private room's
-  // door is its code, which the caller already had to know to get here.
-  //
-  // Checked BEFORE announcing, and against the room as STORED. Announcing
-  // first and undoing it would briefly seat an unverified caller, which is
-  // long enough to show up in a feed poll. A verified caller skips the lookup
-  // entirely — they pass either way.
-  if (!verifyVerifiedToken(req.cookies.get(VERIFIED_COOKIE)?.value)) {
-    const existing = await getRoom(roomId);
-    if (!existing) {
-      return NextResponse.json({ error: "room_not_found" }, { status: 404 });
+  // Both doors are enforced INSIDE announce, against the room as STORED and
+  // in the same breath as the seat decision, so nothing needs a separate
+  // read here:
+  //  - a public room is listed for the whole internet, so its door is the
+  //    university check (a private room's door is its code, which the caller
+  //    already had to know to get here);
+  //  - every member can see every other member's peer id — the mesh needs
+  //    them to place calls — so claiming an id that already has an entry
+  //    requires the token minted when it first joined.
+  const result = await announce(
+    {
+      roomId,
+      peerId,
+      username: (body.value.username ?? "").toString(),
+      status: body.value.status,
+    },
+    {
+      callerVerified: !!verifyVerifiedToken(
+        req.cookies.get(VERIFIED_COOKIE)?.value
+      ),
+      peerTokenValid,
     }
-    if (existing.visibility === "public") {
-      return NextResponse.json(
-        { error: "verification_required" },
-        { status: 403 }
-      );
-    }
-  }
-
-  // Every member can see every other member's peer id — the mesh needs them to
-  // place calls. So an id alone cannot be proof of who you are: without this
-  // check, anyone in the room could re-announce someone else's id and take
-  // over their roster entry, name and status. Claiming an id already in the
-  // room therefore requires the token minted when it first joined.
-  if (!peerTokenValid) {
-    const roster = await listPeers(roomId);
-    if (roster.some((p) => p.peerId === peerId)) {
-      return NextResponse.json({ error: "peer_taken" }, { status: 409 });
-    }
-  }
-
-  const result = await announce({
-    roomId,
-    peerId,
-    username: (body.value.username ?? "").toString(),
-    status: body.value.status,
-  });
+  );
 
   // The room has ended (or never existed). Ephemeral by design — say so
   // rather than starting a fresh room under the same link.
   if (!result) {
     return NextResponse.json({ error: "room_not_found" }, { status: 404 });
+  }
+  if (result.refused === "verification") {
+    return NextResponse.json(
+      { error: "verification_required" },
+      { status: 403 }
+    );
+  }
+  if (result.refused === "taken") {
+    return NextResponse.json({ error: "peer_taken" }, { status: 409 });
   }
   const { peers, room, joined } = result;
 

@@ -41,6 +41,15 @@ export type AnnounceInput = {
   status?: Partial<PeerStatus> & { tint?: string };
 };
 
+// Server-derived facts about the caller, kept OUT of AnnounceInput on
+// purpose: the input's invariant is "nothing a client could lie about", and
+// these two are computed by the route itself — from the verified-university
+// cookie and from the peer-token HMAC — never from the request body.
+export type AnnounceGuard = {
+  callerVerified: boolean;
+  peerTokenValid: boolean;
+};
+
 // Both the in-memory and Redis implementations satisfy this async contract, so
 // the API routes are backend-agnostic.
 // What the home page polls: the public feed plus the global active count
@@ -75,9 +84,23 @@ export interface StoreBackend {
   // `joined` is false when the room was already full and this peer is NOT a
   // member — the caller turns that into a visible "room is full" answer
   // instead of letting someone sit in a room nobody can see them in.
+  //
+  // `refused` rejections (only produced when a guard is passed) come back
+  // WITHOUT the store being touched — a refused caller must not refresh any
+  // TTL or hold the room alive:
+  //   "verification" — the stored room is public and the caller unverified;
+  //   "taken"        — the peer id already has an entry and the caller could
+  //                    not prove it is theirs (closes the roster-read →
+  //                    seat-write TOCTOU the route-level check had).
   announce(
-    input: AnnounceInput
-  ): Promise<{ peers: Peer[]; room: RoomMeta; joined: boolean } | null>;
+    input: AnnounceInput,
+    guard?: AnnounceGuard
+  ): Promise<{
+    peers: Peer[];
+    room: RoomMeta;
+    joined: boolean;
+    refused?: "verification" | "taken";
+  } | null>;
   removePeer(roomId: string, peerId: string): Promise<void>;
   listPeers(roomId: string): Promise<Peer[]>;
 }

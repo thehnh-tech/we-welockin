@@ -1,6 +1,7 @@
 import { Redis } from "@upstash/redis";
 import { getRedisEnv } from "@/lib/env";
 import type {
+  AnnounceGuard,
   AnnounceInput,
   FeedSnapshot,
   Peer,
@@ -252,6 +253,77 @@ async function rebuildFeed(r: Redis, now: number): Promise<FeedSnapshot> {
   return snapshot;
 }
 
+// The seat decision, atomically: purge stale seats FIRST (six silent-30s
+// entries must not block a live arrival — and purge-then-count in separate
+// requests is exactly the 7-in-a-room-of-6 race), then admit members always,
+// newcomers only below capacity, and refresh the room's TTLs. One EVALSHA
+// (with automatic EVAL fallback), billed as one command.
+//
+// KEYS: peers zset, names hash, meta hash.
+// ARGV: now(ms), timeout(ms), isMember("1"/"0"), capacity, peerId,
+//       entry JSON, ttl(s).
+const SEAT_LUA = `
+local cutoff = '(' .. (tonumber(ARGV[1]) - tonumber(ARGV[2]))
+local dead = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', cutoff)
+for i = 1, #dead do
+  redis.call('HDEL', KEYS[2], dead[i])
+  redis.call('ZREM', KEYS[1], dead[i])
+end
+local joined = 0
+if ARGV[3] == '1' or redis.call('ZCARD', KEYS[1]) < tonumber(ARGV[4]) then
+  redis.call('ZADD', KEYS[1], tonumber(ARGV[1]), ARGV[5])
+  redis.call('HSET', KEYS[2], ARGV[5], ARGV[6])
+  joined = 1
+end
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[7]))
+redis.call('EXPIRE', KEYS[2], tonumber(ARGV[7]))
+redis.call('EXPIRE', KEYS[3], tonumber(ARGV[7]))
+return joined
+`;
+
+let seatScript: ReturnType<Redis["createScript"]> | null = null;
+
+async function takeSeat(
+  r: Redis,
+  roomId: string,
+  peerId: string,
+  entry: PeerEntry,
+  alreadyMember: boolean,
+  now: number
+): Promise<boolean> {
+  // Escape hatch while the script beds in: WLIS_SEAT_LUA=0 restores the
+  // previous non-atomic two-step (which tolerates capacity overshoot).
+  if (process.env.WLIS_SEAT_LUA === "0") {
+    const joined =
+      alreadyMember || (await r.zcard(peersKey(roomId))) < ROOM_CAPACITY;
+    const p = r.pipeline();
+    if (joined) {
+      p.zadd(peersKey(roomId), { score: now, member: peerId });
+      p.hset(namesKey(roomId), { [peerId]: JSON.stringify(entry) });
+    }
+    p.expire(metaKey(roomId), ROOM_TTL_SEC);
+    p.expire(peersKey(roomId), ROOM_TTL_SEC);
+    p.expire(namesKey(roomId), ROOM_TTL_SEC);
+    await p.exec();
+    return joined;
+  }
+
+  if (!seatScript) seatScript = r.createScript(SEAT_LUA);
+  const joined = await seatScript.exec(
+    [peersKey(roomId), namesKey(roomId), metaKey(roomId)],
+    [
+      String(now),
+      String(PEER_TIMEOUT_MS),
+      alreadyMember ? "1" : "0",
+      String(ROOM_CAPACITY),
+      peerId,
+      JSON.stringify(entry),
+      String(ROOM_TTL_SEC),
+    ]
+  );
+  return Number(joined) === 1;
+}
+
 export const redisBackend: StoreBackend = {
   async getRoom(id) {
     const roomId = sanitizeRoomId(id);
@@ -341,42 +413,53 @@ export const redisBackend: StoreBackend = {
     return meta;
   },
 
-  async announce(input: AnnounceInput) {
+  // Three HTTP round-trips instead of the ~10 sequential commands this used
+  // to cost — at 200 users heartbeating this path IS the load.
+  async announce(input: AnnounceInput, guard?: AnnounceGuard) {
     const r = redis();
     const now = Date.now();
     const roomId = sanitizeRoomId(input.roomId);
+    const peerId = sanitizePeerId(input.peerId);
 
-    const meta = parseMeta(
-      roomId,
-      await r.hgetall<RawMeta>(metaKey(roomId)),
-      now
-    );
+    // 1: room meta + our previous entry, together.
+    const readPipe = r.pipeline();
+    readPipe.hgetall(metaKey(roomId));
+    readPipe.hget(namesKey(roomId), peerId);
+    const [rawMeta, existingRaw] = await readPipe.exec<
+      [RawMeta | null, unknown]
+    >();
+
+    const meta = parseMeta(roomId, rawMeta, now);
     if (!meta) return null; // rooms are born only in createRoom
 
-    const peerId = sanitizePeerId(input.peerId);
-    const existingRaw = await r.hget(namesKey(roomId), peerId);
-    const alreadyMember = existingRaw !== null;
-    const peerCount = await r.zcard(peersKey(roomId));
-    // Members always get back in (a heartbeat must never be evicted by the
-    // cap); a newcomer only when there is a free seat.
-    const joined = alreadyMember || peerCount < ROOM_CAPACITY;
-    if (joined) {
-      const prev = parsePeerEntry(existingRaw, now);
-      const entry: PeerEntry = {
-        username: sanitizeUsername(input.username),
-        joinedAt: alreadyMember ? prev.joinedAt : now,
-        status: sanitizeStatus(input.status),
-      };
-      await r.zadd(peersKey(roomId), { score: now, member: peerId });
-      await r.hset(namesKey(roomId), { [peerId]: JSON.stringify(entry) });
+    // Refusals return before the seat is taken and before any TTL refresh —
+    // a refused caller must not hold the room alive.
+    if (guard && meta.visibility === "public" && !guard.callerVerified) {
+      return { peers: [], room: meta, joined: false, refused: "verification" as const };
+    }
+    const alreadyMember = existingRaw !== null && existingRaw !== undefined;
+    if (alreadyMember && guard && !guard.peerTokenValid) {
+      return { peers: [], room: meta, joined: false, refused: "taken" as const };
     }
 
-    // Refresh TTLs so an active room lives on and an abandoned one expires.
-    await r.expire(metaKey(roomId), ROOM_TTL_SEC);
-    await r.expire(peersKey(roomId), ROOM_TTL_SEC);
-    await r.expire(namesKey(roomId), ROOM_TTL_SEC);
+    const prev = parsePeerEntry(existingRaw, now);
+    const entry: PeerEntry = {
+      username: sanitizeUsername(input.username),
+      joinedAt: alreadyMember ? prev.joinedAt : now,
+      status: sanitizeStatus(input.status),
+    };
 
-    const peers = await readPeers(roomId, now);
+    // 2: the seat decision — atomic in Lua (with a two-step escape hatch).
+    const joined = await takeSeat(r, roomId, peerId, entry, alreadyMember, now);
+
+    // 3: the roster we return (the Lua purge already ran, so no prune here).
+    const rosterPipe = r.pipeline();
+    rosterPipe.zrange(peersKey(roomId), 0, -1, { withScores: true });
+    rosterPipe.hgetall(namesKey(roomId));
+    const [rawZ, names] = await rosterPipe.exec<
+      [(string | number)[], Record<string, unknown> | null]
+    >();
+    const peers = toPeers(splitLive(rawZ ?? [], now).live, names ?? {});
     return { peers, room: meta, joined };
   },
 

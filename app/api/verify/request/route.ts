@@ -34,7 +34,11 @@ export async function POST(req: NextRequest) {
   const now = Date.now();
 
   // Layered limits: per-IP flood guard, per-email budget, resend cooldown.
-  if (!(await allowVerify(`vr:ip:${ip}`, 10, 600, now))) return rateLimited();
+  // The IP guard is wide on purpose — the launch-night audience is a lecture
+  // hall of students behind one campus NAT, and at 10/10min it took an hour
+  // to onboard a library. The real cost ceiling (emails sent) is carried by
+  // the per-email budget and cooldown below.
+  if (!(await allowVerify(`vr:ip:${ip}`, 100, 600, now))) return rateLimited();
   if (!(await allowVerify(`vr:em:${email}`, 6, 3600, now))) return rateLimited();
   const existing = await getCode(email, now);
   if (existing && now - existing.issuedAt < OTP_RESEND_COOLDOWN_SEC * 1000) {

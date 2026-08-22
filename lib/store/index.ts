@@ -4,7 +4,12 @@ import { allowVerify } from "@/lib/verify/store";
 import { memoryBackend } from "./memory";
 import { mongoBackend } from "./mongo";
 import { redisAllowMulti, redisBackend } from "./redis";
-import type { AnnounceInput, RoomMeta, StoreBackend } from "./types";
+import type {
+  AnnounceGuard,
+  AnnounceInput,
+  RoomMeta,
+  StoreBackend,
+} from "./types";
 
 export type { Peer, RoomMeta, RoomPublic, AnnounceInput } from "./types";
 
@@ -18,12 +23,36 @@ const backend: StoreBackend = isRedisConfigured()
     ? mongoBackend
     : memoryBackend;
 
+export function activeBackendName(): "redis" | "mongo" | "memory" {
+  return backend === redisBackend
+    ? "redis"
+    : backend === mongoBackend
+      ? "mongo"
+      : "memory";
+}
+
+// The memory fallback is per-instance: on a serverless deployment two people
+// in the same room can land on different instances and never see each other,
+// and the rate limiter fragments the same way. That failure mode is invisible
+// in a solo test — everything works on one instance — so a silent fallback
+// ships green and breaks on launch night. No throw (it would break builds
+// that inject env at runtime), but it should be impossible to miss in logs,
+// and GET /api/health reports it.
+if (process.env.VERCEL && backend === memoryBackend) {
+  console.error(
+    "[store] NO SHARED STORE CONFIGURED on a serverless deployment: presence " +
+      "is per-instance and users will not reliably see each other. Set " +
+      "UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (or MONGODB_URI)."
+  );
+}
+
 export const getRoom = (id: string) => backend.getRoom(id);
 export const listActiveRooms = () => backend.listActiveRooms();
 export const countActivePeers = () => backend.countActivePeers();
 export const getFeed = () => backend.getFeed();
 export const createRoom = (meta: RoomMeta) => backend.createRoom(meta);
-export const announce = (input: AnnounceInput) => backend.announce(input);
+export const announce = (input: AnnounceInput, guard?: AnnounceGuard) =>
+  backend.announce(input, guard);
 export const removePeer = (roomId: string, peerId: string) =>
   backend.removePeer(roomId, peerId);
 export const listPeers = (roomId: string) => backend.listPeers(roomId);

@@ -1,4 +1,5 @@
 import type {
+  AnnounceGuard,
   AnnounceInput,
   Peer,
   RoomMeta,
@@ -155,17 +156,36 @@ export const memoryBackend: StoreBackend = {
     return toMeta(room);
   },
 
-  async announce(input: AnnounceInput) {
+  async announce(input: AnnounceInput, guard?: AnnounceGuard) {
     const now = Date.now();
     const roomId = sanitizeRoomId(input.roomId);
     const room = store.rooms.get(roomId);
     if (!room) return null; // rooms are born only in createRoom
 
+    // Refused callers must not touch the room's state (not even the grace
+    // window) — refusal comes before any mutation.
+    if (guard && room.visibility === "public" && !guard.callerVerified) {
+      return {
+        peers: [],
+        room: toMeta(room),
+        joined: false,
+        refused: "verification" as const,
+      };
+    }
+
     const peerId = sanitizePeerId(input.peerId);
     cleanupRoom(room, now);
+    const existing = room.peers.get(peerId);
+    if (existing && guard && !guard.peerTokenValid) {
+      return {
+        peers: [],
+        room: toMeta(room),
+        joined: false,
+        refused: "taken" as const,
+      };
+    }
     // Members always get back in (a heartbeat must never be evicted by the
     // cap); a newcomer only when there is a free seat.
-    const existing = room.peers.get(peerId);
     const joined = !!existing || room.peers.size < ROOM_CAPACITY;
     if (joined) {
       room.peers.set(peerId, {
