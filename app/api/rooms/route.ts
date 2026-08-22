@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { allowMutation, createRoom, getFeed, type RoomMeta } from "@/lib/store";
+import {
+  allowFeed,
+  allowMutation,
+  createRoom,
+  getFeed,
+  type RoomMeta,
+} from "@/lib/store";
 import { DEFAULT_DURATION_SEC } from "@/lib/store/sanitize";
 import { generateRoomId } from "@/lib/roomCode";
 import { VERIFIED_COOKIE, verifyVerifiedToken } from "@/lib/verify/token";
@@ -21,7 +27,14 @@ const ARCHIVE_TTL_MS = 180 * 24 * 3600 * 1000; // 180 days
 // is doubly shared: served from the store's snapshot, and cached at the CDN
 // so V pollers cost ~1 origin hit per few seconds per region (next.config.mjs
 // exempts exactly this path from the blanket no-store on /api).
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // The CDN absorbs honest pollers, but its cache key includes the query
+  // string — so `?x=1`, `?x=2`, … walks straight past it to the origin, and
+  // each miss costs a full feed computation. The limiter is what actually
+  // bounds that; the cache is only an optimization. Generous, because a whole
+  // campus behind one NAT legitimately polls this every few seconds.
+  if (!(await allowFeed(clientIp(req)))) return rateLimited(5);
+
   const { activeUsers, rooms } = await getFeed();
   return NextResponse.json(
     { activeUsers: BASE_ACTIVE_USERS + activeUsers, rooms },

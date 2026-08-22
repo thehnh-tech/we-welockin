@@ -124,3 +124,22 @@ export function allowHeartbeat(
 export function allowRead(ip: string): Promise<boolean> {
   return allow(`read:${ip}`, 300, 60);
 }
+
+// The public feed. A CDN normally serves this, but its cache key includes the
+// query string, so a caller who varies it reaches the origin every time and
+// pays for a full feed computation. Sized for a campus polling every few
+// seconds, which is roughly 20/min per person.
+export function allowFeed(ip: string): Promise<boolean> {
+  return allow(`feed:${ip}`, 1200, 60);
+}
+
+// Taking a NEW seat (as opposed to heartbeating one you hold). Bounded per
+// address and per verified account because a public room's seats are its
+// scarcest resource: without this, one cookie could sit in every room on the
+// feed at once and leave nothing for anyone else.
+export function allowJoin(ip: string, identity: string): Promise<boolean> {
+  return allowMulti([
+    { key: `join:ip:${ip}`, limit: 30, windowSec: 600 },
+    { key: `join:id:${identity}`, limit: 20, windowSec: 600 },
+  ]);
+}

@@ -25,6 +25,9 @@ import {
 
 type MemRoom = RoomMeta & {
   peers: Map<string, Peer>;
+  // Peer ids seated at any point in this room's life. Outlives the live
+  // roster on purpose — see StoreBackend.hasClaim.
+  claims: Set<string>;
   emptySince: number | null;
 };
 
@@ -148,6 +151,7 @@ export const memoryBackend: StoreBackend = {
       visibility: sanitizeVisibility(meta.visibility),
       institution: sanitizeInstitution(meta.institution),
       peers: new Map(),
+      claims: new Set(),
       // Empty until the creator's first announce — the grace window keeps it
       // alive meanwhile.
       emptySince: now,
@@ -176,7 +180,10 @@ export const memoryBackend: StoreBackend = {
     const peerId = sanitizePeerId(input.peerId);
     cleanupRoom(room, now);
     const existing = room.peers.get(peerId);
-    if (existing && guard && !guard.peerTokenValid) {
+    // Gate on the CLAIM, not on live presence: cleanupRoom above has just
+    // dropped anyone quiet for 30s, and gating on `existing` would hand their
+    // seat — and with it their token — to whoever asked next.
+    if (room.claims.has(peerId) && guard && !guard.peerTokenValid) {
       return {
         peers: [],
         room: toMeta(room),
@@ -195,6 +202,7 @@ export const memoryBackend: StoreBackend = {
         joinedAt: existing?.joinedAt ?? now,
         status: sanitizeStatus(input.status),
       });
+      room.claims.add(peerId);
       room.emptySince = null;
     }
 
@@ -208,7 +216,10 @@ export const memoryBackend: StoreBackend = {
   async removePeer(roomId, peerId) {
     const room = store.rooms.get(sanitizeRoomId(roomId));
     if (!room) return;
-    room.peers.delete(sanitizePeerId(peerId));
+    const pid = sanitizePeerId(peerId);
+    room.peers.delete(pid);
+    // A deliberate departure releases the id; only staleness preserves it.
+    room.claims.delete(pid);
     // Do not delete the room here — keep metadata for the grace window
     // (cleanupAll drops it once it has stayed empty past ROOM_GRACE_MS).
     if (room.peers.size === 0 && room.emptySince === null) {

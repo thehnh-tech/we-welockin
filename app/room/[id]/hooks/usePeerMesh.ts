@@ -101,6 +101,27 @@ export function usePeerMesh(opts: {
     let peerToken: string | null = null;
     let inFlight = false;
 
+    // Start over under a brand-new peer id. Used whenever our current one is
+    // unusable — the broker still holds it after a reconnect, or the server
+    // says the seat is claimed and we cannot prove it is ours. Cheaper and
+    // more reliable than fighting for an id we may never win; the abandoned
+    // seat expires on its own and the others re-call us off the next roster.
+    const rejoinWithNewIdentity = () => {
+      if (cancelled) return;
+      try {
+        peer?.destroy();
+      } catch {}
+      myId = null;
+      peerToken = null;
+      inFlight = false;
+      setConnected(false);
+      if (heartbeatTimer) clearTimeout(heartbeatTimer);
+      heartbeatTimer = null;
+      setTimeout(() => {
+        if (!cancelled) init();
+      }, 1_000);
+    };
+
     // One round-trip does double duty: it refreshes our presence (heartbeat,
     // including live status) and returns the current peer list, so there is no
     // separate poll loop.
@@ -156,6 +177,14 @@ export function usePeerMesh(opts: {
             if (why?.error === "room_full") {
               slowRetry = true;
               setBlockedReason("full");
+            } else if (why?.error === "peer_taken") {
+              // Our id is spoken for and we cannot prove it is ours — which
+              // is what happens if the response that carried our token was
+              // lost. Take a fresh identity rather than retrying an id we can
+              // never win: the abandoned seat expires server-side, and the
+              // others re-call us off the next roster.
+              console.error("peer id contested — reconnecting with a new one");
+              rejoinWithNewIdentity();
             } else console.error("announce conflict", why?.error);
             return;
           }
@@ -394,17 +423,14 @@ export function usePeerMesh(opts: {
         console.error("PeerJS error", err);
         if (cancelled) return;
         // A reconnect whose id is still registered on the broker comes back
+        // as unavailable-id, a fatal error that destroys the Peer.
+        // A reconnect whose id is still registered on the broker comes back
         // as unavailable-id, a fatal error that destroys the Peer. Recover by
         // building a fresh Peer with a fresh id instead of asking the user to
         // reload: the old seat expires server-side within 30s and everyone
         // re-calls the new id off the next roster.
         if ((err as { type?: string })?.type === "unavailable-id") {
-          try {
-            peer?.destroy();
-          } catch {}
-          setTimeout(() => {
-            if (!cancelled) init();
-          }, 1_000);
+          rejoinWithNewIdentity();
           return;
         }
         const msg = peerErrorMessage((err as { type?: string })?.type);

@@ -24,10 +24,51 @@ export type JsonBody<T> =
   | { ok: true; value: T }
   | { ok: false; response: NextResponse };
 
+// Refuse a request that another site made the browser send.
+//
+// Two checks, because either alone has a gap. A cross-site <form> can only
+// send text/plain, urlencoded or multipart — never application/json — so
+// demanding JSON blocks the form trick (a body like
+// `{"email":"a@b.c","x":"` … `"}` is valid JSON when posted as text/plain).
+// And a cross-site fetch that DOES set application/json triggers a CORS
+// preflight this app never answers. The Origin check then covers anything
+// that slips past content-type reasoning.
+//
+// This matters most on /api/verify/confirm: without it, a page could make a
+// visitor's browser accept the ATTACKER's verification cookie, so every
+// public room that person went on to create would carry the attacker's email
+// and institution.
+export function isCrossSite(req: NextRequest): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return false; // no Origin at all: fall back to content-type
+  try {
+    return new URL(origin).host !== req.headers.get("host");
+  } catch {
+    return true; // unparseable Origin is not something to trust
+  }
+}
+
+export function crossSiteRejected(): NextResponse {
+  return NextResponse.json({ error: "cross_site" }, { status: 403 });
+}
+
 export async function readJsonBody<T>(
   req: NextRequest,
   maxBytes: number
 ): Promise<JsonBody<T>> {
+  if (isCrossSite(req)) {
+    return { ok: false, response: crossSiteRejected() };
+  }
+  const contentType = req.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().split(";")[0].trim().startsWith("application/json")) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "unsupported_media_type" },
+        { status: 415 }
+      ),
+    };
+  }
   const raw = await req.text();
   if (raw.length > maxBytes) {
     return {

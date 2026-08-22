@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   allowHeartbeat,
+  allowJoin,
   allowMutation,
   announce,
   removePeer,
@@ -8,7 +9,13 @@ import {
 import { ROOM_CAPACITY, sanitizeRoomId } from "@/lib/store/sanitize";
 import { VERIFIED_COOKIE, verifyVerifiedToken } from "@/lib/verify/token";
 import { signPeerToken, verifyPeerToken } from "@/lib/verify/peerToken";
-import { clientIp, rateLimited, readJsonBody } from "@/lib/http";
+import {
+  clientIp,
+  crossSiteRejected,
+  isCrossSite,
+  rateLimited,
+  readJsonBody,
+} from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -49,10 +56,20 @@ export async function POST(
   // budget, so heartbeats from a whole campus behind one NAT never starve
   // each other. Everyone else (first joins) shares the per-IP budget.
   const peerTokenValid = verifyPeerToken(roomId, peerId, body.value.peerToken);
-  const allowed = peerTokenValid
-    ? await allowHeartbeat(clientIp(req), roomId, peerId)
-    : await allowMutation(clientIp(req));
-  if (!allowed) return rateLimited(10);
+  const verified = verifyVerifiedToken(req.cookies.get(VERIFIED_COOKIE)?.value);
+  const ip = clientIp(req);
+
+  if (peerTokenValid) {
+    if (!(await allowHeartbeat(ip, roomId, peerId))) return rateLimited(10);
+  } else {
+    // Taking a NEW seat. Seats are a public room's scarcest resource — six per
+    // room — so without a budget of its own one caller could sit in every room
+    // on the feed at once and leave nothing for the students it is meant for.
+    // Keyed on the verified account when there is one, so switching networks
+    // does not reset it.
+    if (!(await allowMutation(ip))) return rateLimited(10);
+    if (!(await allowJoin(ip, verified?.email ?? ip))) return rateLimited(60);
+  }
 
   // Both doors are enforced INSIDE announce, against the room as STORED and
   // in the same breath as the seat decision, so nothing needs a separate
@@ -70,12 +87,7 @@ export async function POST(
       username: (body.value.username ?? "").toString(),
       status: body.value.status,
     },
-    {
-      callerVerified: !!verifyVerifiedToken(
-        req.cookies.get(VERIFIED_COOKIE)?.value
-      ),
-      peerTokenValid,
-    }
+    { callerVerified: !!verified, peerTokenValid }
   );
 
   // The room has ended (or never existed). Ephemeral by design — say so
@@ -118,6 +130,10 @@ export async function DELETE(
   const { id } = await params;
   const roomId = sanitizeRoomId(id);
   if (!roomId) return badRoom();
+
+  // No JSON body here, so this route needs its own cross-site guard rather
+  // than inheriting readJsonBody's.
+  if (isCrossSite(req)) return crossSiteRejected();
 
   if (!(await allowMutation(clientIp(req)))) return rateLimited(10);
 

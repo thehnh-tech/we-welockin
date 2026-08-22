@@ -262,6 +262,11 @@ async function rebuildFeed(r: Redis, now: number): Promise<FeedSnapshot> {
 // newcomers only below capacity, and refresh the room's TTLs. One EVALSHA
 // (with automatic EVAL fallback), billed as one command.
 //
+// The purge frees the SEAT (the zset) but deliberately leaves the names-hash
+// entry alone: that entry is the peer's claim on its id, and dropping it would
+// let anyone re-announce a briefly-absent member's id and be handed their
+// token. It expires with the room, and leaving deliberately releases it.
+//
 // KEYS: peers zset, names hash, meta hash.
 // ARGV: now(ms), timeout(ms), isMember("1"/"0"), capacity, peerId,
 //       entry JSON, ttl(s).
@@ -269,7 +274,6 @@ const SEAT_LUA = `
 local cutoff = '(' .. (tonumber(ARGV[1]) - tonumber(ARGV[2]))
 local dead = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', cutoff)
 for i = 1, #dead do
-  redis.call('HDEL', KEYS[2], dead[i])
   redis.call('ZREM', KEYS[1], dead[i])
 end
 local joined = 0
@@ -424,13 +428,12 @@ export const redisBackend: StoreBackend = {
     const roomId = sanitizeRoomId(input.roomId);
     const peerId = sanitizePeerId(input.peerId);
 
-    // 1: room meta + our previous entry (and its liveness), together.
+    // 1: room meta + our seat claim, together.
     const readPipe = r.pipeline();
     readPipe.hgetall(metaKey(roomId));
     readPipe.hget(namesKey(roomId), peerId);
-    readPipe.zscore(peersKey(roomId), peerId);
-    const [rawMeta, existingRaw, existingScore] = await readPipe.exec<
-      [RawMeta | null, unknown, number | null]
+    const [rawMeta, existingRaw] = await readPipe.exec<
+      [RawMeta | null, unknown]
     >();
 
     const meta = parseMeta(roomId, rawMeta, now);
@@ -442,17 +445,17 @@ export const redisBackend: StoreBackend = {
       return { peers: [], room: meta, joined: false, refused: "verification" as const };
     }
     const alreadyMember = existingRaw !== null && existingRaw !== undefined;
-    // "taken" only defends a LIVE seat. An entry whose heartbeats stopped is
-    // an orphan, and the commonest orphan is our own: first announce seats
-    // us server-side but the response is lost, so the retry arrives with no
-    // token. Refusing on the dead entry would lock that user out until
-    // someone else's seat script purges it — or kill a solo room outright.
-    const liveMember =
-      alreadyMember &&
-      existingScore !== null &&
-      existingScore !== undefined &&
-      now - Number(existingScore) <= PEER_TIMEOUT_MS;
-    if (liveMember && guard && !guard.peerTokenValid) {
+    // Defends the CLAIM, not just a live seat. Gating on liveness would mean
+    // that anyone who lets a member's presence lapse for 30s — by waiting, or
+    // by forcing the stale purge with one unauthenticated room lookup — can
+    // announce that member's id, be seated, and be handed the member's token,
+    // which is then permanent. A caller who legitimately holds the id and lost
+    // its token recovers by taking a fresh one: the client answers "taken" by
+    // reconnecting under a new peer id.
+    //
+    // The names entry is the claim and carries the room's TTL, so it cannot
+    // outlive the session; leaving deliberately (DELETE) releases it.
+    if (alreadyMember && guard && !guard.peerTokenValid) {
       return { peers: [], room: meta, joined: false, refused: "taken" as const };
     }
 
