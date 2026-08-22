@@ -68,7 +68,9 @@ export async function POST(
     // Keyed on the verified account when there is one, so switching networks
     // does not reset it.
     if (!(await allowMutation(ip))) return rateLimited(10);
-    if (!(await allowJoin(ip, verified?.email ?? ip))) return rateLimited(60);
+    if (!(await allowJoin(ip, verified?.email ?? null))) {
+      return rateLimited(60);
+    }
   }
 
   // Both doors are enforced INSIDE announce, against the room as STORED and

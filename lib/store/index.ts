@@ -133,13 +133,34 @@ export function allowFeed(ip: string): Promise<boolean> {
   return allow(`feed:${ip}`, 1200, 60);
 }
 
-// Taking a NEW seat (as opposed to heartbeating one you hold). Bounded per
-// address and per verified account because a public room's seats are its
-// scarcest resource: without this, one cookie could sit in every room on the
-// feed at once and leave nothing for anyone else.
-export function allowJoin(ip: string, identity: string): Promise<boolean> {
-  return allowMulti([
-    { key: `join:ip:${ip}`, limit: 30, windowSec: 600 },
-    { key: `join:id:${identity}`, limit: 20, windowSec: 600 },
-  ]);
+// Taking a NEW seat (as opposed to heartbeating one you hold). A public
+// room's seats are its scarcest resource — six per room — so one caller must
+// not be able to sit in every room on the feed at once.
+//
+// The account is the real control here, and it only exists for a verified
+// caller: pass null for everyone else rather than falling back to the IP.
+// That fallback turned the per-account window into a SECOND, tighter per-IP
+// window, and since a private room needs no verification it applied to
+// essentially everyone — 20 joins per 10 minutes for an entire building.
+// Measured on a campus NAT: 67% of heartbeats refused, students locked out
+// of rooms they were already sitting in.
+//
+// The per-address window is therefore sized for the worst legitimate case, a
+// university NAT: 300 per 10 minutes is 30 a minute for a whole campus,
+// generous for humans while still bounding a script — which also pays
+// allowMutation (600/min) and cannot exceed room capacity anyway. Refused
+// attempts count too (the counter increments before the verdict), so a
+// student hammering a full room spends budget; at this size that costs
+// precision, not access.
+export function allowJoin(
+  ip: string,
+  identity: string | null
+): Promise<boolean> {
+  const windows: LimitWindow[] = [
+    { key: `join:ip:${ip}`, limit: 300, windowSec: 600 },
+  ];
+  if (identity) {
+    windows.push({ key: `join:id:${identity}`, limit: 20, windowSec: 600 });
+  }
+  return allowMulti(windows);
 }
