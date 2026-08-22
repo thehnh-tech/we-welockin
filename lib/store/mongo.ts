@@ -175,6 +175,15 @@ export const mongoBackend: StoreBackend = {
     });
   },
 
+  // 3 indexed queries total — cheap enough to skip the snapshot Redis needs.
+  async getFeed() {
+    const [activeUsers, rooms] = await Promise.all([
+      mongoBackend.countActivePeers(),
+      mongoBackend.listActiveRooms(),
+    ]);
+    return { activeUsers, rooms };
+  },
+
   async createRoom(inputMeta) {
     const db = await getDb();
     const now = Date.now();

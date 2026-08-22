@@ -124,6 +124,14 @@ export const memoryBackend: StoreBackend = {
     return total;
   },
 
+  // No snapshot needed in-process: both halves are cheap map walks.
+  async getFeed() {
+    return {
+      activeUsers: await memoryBackend.countActivePeers(),
+      rooms: await memoryBackend.listActiveRooms(),
+    };
+  },
+
   async createRoom(meta) {
     const now = Date.now();
     if (store.rooms.size >= MAX_ROOMS) cleanupAll(now);

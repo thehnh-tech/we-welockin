@@ -3,7 +3,7 @@ import { isMongoConfigured } from "@/lib/db/mongo";
 import { allowVerify } from "@/lib/verify/store";
 import { memoryBackend } from "./memory";
 import { mongoBackend } from "./mongo";
-import { redisAllow, redisBackend } from "./redis";
+import { redisAllowMulti, redisBackend } from "./redis";
 import type { AnnounceInput, RoomMeta, StoreBackend } from "./types";
 
 export type { Peer, RoomMeta, RoomPublic, AnnounceInput } from "./types";
@@ -21,6 +21,7 @@ const backend: StoreBackend = isRedisConfigured()
 export const getRoom = (id: string) => backend.getRoom(id);
 export const listActiveRooms = () => backend.listActiveRooms();
 export const countActivePeers = () => backend.countActivePeers();
+export const getFeed = () => backend.getFeed();
 export const createRoom = (meta: RoomMeta) => backend.createRoom(meta);
 export const announce = (input: AnnounceInput) => backend.announce(input);
 export const removePeer = (roomId: string, peerId: string) =>
@@ -32,19 +33,27 @@ export const listPeers = (roomId: string) => backend.listPeers(roomId);
 // guessing oracle against it. The in-memory limiter is used when no shared
 // store is configured — weaker across instances than a shared counter, but far
 // better than the previous unconditional `true`.
-async function allow(
-  key: string,
-  limit: number,
-  windowSec: number
-): Promise<boolean> {
+type LimitWindow = { key: string; limit: number; windowSec: number };
+
+async function allowMulti(entries: LimitWindow[]): Promise<boolean> {
   if (isRedisConfigured()) {
     try {
-      return await redisAllow(key, limit, windowSec);
-    } catch {
-      return true; // never let a limiter outage take down the app
+      return await redisAllowMulti(entries);
+    } catch (err) {
+      // Never let a limiter outage take down the app — but never silently
+      // either: a broken limiter under load is exactly when it matters.
+      console.error("[store] rate limiter unavailable, failing open:", err);
+      return true;
     }
   }
-  return allowVerify(`rl:${key}`, limit, windowSec); // fail-open inside
+  const results = await Promise.all(
+    entries.map((e) => allowVerify(`rl:${e.key}`, e.limit, e.windowSec))
+  ); // fail-open inside
+  return results.every(Boolean);
+}
+
+function allow(key: string, limit: number, windowSec: number) {
+  return allowMulti([{ key, limit, windowSec }]);
 }
 
 // Budgets are set against the worst legitimate case, which is a university
@@ -53,10 +62,30 @@ async function allow(
 // so these are generous, and lean on the code's 887M-wide id space to make
 // guessing impractical rather than on a small per-minute number.
 
-// Writes: creating rooms, announcing presence, leaving. ~40 concurrent peers
-// per shared address.
+// Writes: creating rooms, first joins, leaving. ~40 concurrent peers per
+// shared address at the old 4s cadence — and since seated members heartbeat
+// on their own per-seat budget (below), this window now only carries the
+// bursts: arrivals, departures, room creation.
 export function allowMutation(ip: string): Promise<boolean> {
   return allow(`mut:${ip}`, 600, 60);
+}
+
+// Heartbeats of a seated member, authenticated by their peer token (HMAC,
+// verified without a store round-trip). Per-seat budget instead of the shared
+// per-IP one, so a whole campus can sit behind one NAT without the beats
+// starving each other: 30/min leaves ~5x headroom over the 10s cadence plus
+// status-change announces. The wide per-address ceiling rides along because
+// peer tokens never expire — someone recycling peerIds in their own room
+// could otherwise mint themselves an unbounded stack of budgets.
+export function allowHeartbeat(
+  ip: string,
+  roomId: string,
+  peerId: string
+): Promise<boolean> {
+  return allowMulti([
+    { key: `hb:${roomId}:${peerId}`, limit: 30, windowSec: 60 },
+    { key: `flood:${ip}`, limit: 3000, windowSec: 60 },
+  ]);
 }
 
 // Reads: room lookup and roster — one or two per person per session, so this

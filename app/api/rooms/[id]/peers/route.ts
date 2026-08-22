@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  allowHeartbeat,
   allowMutation,
-  allowRead,
   announce,
   getRoom,
   listPeers,
@@ -15,28 +15,15 @@ import { clientIp, rateLimited, readJsonBody } from "@/lib/http";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const MAX_BODY_BYTES = 4096;
+const MAX_BODY_BYTES = 2048;
 
 const badRoom = () =>
   NextResponse.json({ error: "invalid_room" }, { status: 400 });
 
-// Public view: usernames only. peerId / status / joinedAt are reserved for
-// members (they get the full list from their own announce response) — exposing
-// peerIds here would let anyone impersonate a member's presence entry.
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  if (!(await allowRead(clientIp(req)))) return rateLimited();
-  const { id } = await params;
-  const roomId = sanitizeRoomId(id);
-  if (!roomId) return badRoom();
-  const peers = await listPeers(roomId);
-  return NextResponse.json({
-    peers: peers.map((p) => ({ username: p.username })),
-  });
-}
-
+// Presence heartbeat. It carries no room metadata — the room's name, timer,
+// visibility and institution are fixed at creation (POST /api/rooms) and read
+// from the store — so there is nothing here a client could lie about, and no
+// way for this call to bring a room into existence at an id of its choosing.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -45,17 +32,10 @@ export async function POST(
   const roomId = sanitizeRoomId(id);
   if (!roomId) return badRoom();
 
-  if (!(await allowMutation(clientIp(req)))) return rateLimited();
-
   const body = await readJsonBody<{
     peerId?: string;
     peerToken?: string;
     username?: string;
-    name?: string;
-    subject?: string;
-    durationSec?: number;
-    startedAt?: number;
-    visibility?: string;
     status?: { muted?: boolean; away?: boolean; deep?: boolean };
   }>(req, MAX_BODY_BYTES);
   if (!body.ok) return body.response;
@@ -65,18 +45,31 @@ export async function POST(
     return NextResponse.json({ error: "peerId required" }, { status: 400 });
   }
 
-  const token = verifyVerifiedToken(req.cookies.get(VERIFIED_COOKIE)?.value);
+  // The body is read before rate limiting (it is size-capped, so that's safe)
+  // because the budget depends on who is asking: a seated member proves
+  // itself with its peer token — a local HMAC check — and pays a per-seat
+  // budget, so heartbeats from a whole campus behind one NAT never starve
+  // each other. Everyone else (first joins) shares the per-IP budget.
+  const peerTokenValid = verifyPeerToken(roomId, peerId, body.value.peerToken);
+  const allowed = peerTokenValid
+    ? await allowHeartbeat(clientIp(req), roomId, peerId)
+    : await allowMutation(clientIp(req));
+  if (!allowed) return rateLimited(10);
 
   // A public room is listed for the whole internet, so its door is the
   // university check — the same one that gates creating it. A private room's
   // door is its code, which the caller already had to know to get here.
   //
-  // This is the ONLY place that decision can be enforced: the client is free
-  // to lie about the room in its request body, so the answer comes from the
-  // room as STORED. Verified callers skip the lookup — they pass either way.
-  if (!token) {
+  // Checked BEFORE announcing, and against the room as STORED. Announcing
+  // first and undoing it would briefly seat an unverified caller, which is
+  // long enough to show up in a feed poll. A verified caller skips the lookup
+  // entirely — they pass either way.
+  if (!verifyVerifiedToken(req.cookies.get(VERIFIED_COOKIE)?.value)) {
     const existing = await getRoom(roomId);
-    if (existing?.visibility === "public") {
+    if (!existing) {
+      return NextResponse.json({ error: "room_not_found" }, { status: 404 });
+    }
+    if (existing.visibility === "public") {
       return NextResponse.json(
         { error: "verification_required" },
         { status: 403 }
@@ -85,39 +78,30 @@ export async function POST(
   }
 
   // Every member can see every other member's peer id — the mesh needs them to
-  // place calls. So an id alone cannot be the proof of who you are: without
-  // this check, anyone in the room could re-announce someone else's id and
-  // take over their roster entry, name and status. Claiming an id already in
-  // the room therefore requires the token minted when it first joined.
-  const roster = await listPeers(roomId);
-  const isTakeover = roster.some((p) => p.peerId === peerId);
-  if (isTakeover && !verifyPeerToken(roomId, peerId, body.value.peerToken)) {
-    return NextResponse.json({ error: "peer_taken" }, { status: 409 });
+  // place calls. So an id alone cannot be proof of who you are: without this
+  // check, anyone in the room could re-announce someone else's id and take
+  // over their roster entry, name and status. Claiming an id already in the
+  // room therefore requires the token minted when it first joined.
+  if (!peerTokenValid) {
+    const roster = await listPeers(roomId);
+    if (roster.some((p) => p.peerId === peerId)) {
+      return NextResponse.json({ error: "peer_taken" }, { status: 409 });
+    }
   }
 
-  // The first announce creates the room, so "public" here is a creation
-  // request for the feed: only honored with a verified-university cookie
-  // (whose institution then labels the room). Anything else lands private.
-  // Rooms pre-created via POST /api/rooms keep their stored meta regardless.
-  let visibility = body.value.visibility;
-  let institution: string | undefined;
-  if (visibility === "public") {
-    if (token) institution = token.institution;
-    else visibility = "private";
-  }
-
-  const { peers, room, joined } = await announce({
+  const result = await announce({
     roomId,
     peerId,
     username: (body.value.username ?? "").toString(),
-    name: body.value.name,
-    subject: body.value.subject,
-    durationSec: body.value.durationSec,
-    startedAt: body.value.startedAt,
-    visibility,
-    institution,
     status: body.value.status,
   });
+
+  // The room has ended (or never existed). Ephemeral by design — say so
+  // rather than starting a fresh room under the same link.
+  if (!result) {
+    return NextResponse.json({ error: "room_not_found" }, { status: 404 });
+  }
+  const { peers, room, joined } = result;
 
   // Full: say so instead of leaving someone in a room where nobody can see
   // them (the store declines to register the peer, so silence would look like
@@ -129,7 +113,6 @@ export async function POST(
     );
   }
 
-  // `room` is already the public meta shape.
   return NextResponse.json({
     peers,
     room,
@@ -145,7 +128,7 @@ export async function DELETE(
   const roomId = sanitizeRoomId(id);
   if (!roomId) return badRoom();
 
-  if (!(await allowMutation(clientIp(req)))) return rateLimited();
+  if (!(await allowMutation(clientIp(req)))) return rateLimited(10);
 
   const peerId = req.nextUrl.searchParams.get("peerId");
   if (!peerId) {

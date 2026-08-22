@@ -43,10 +43,23 @@ export type AnnounceInput = {
 
 // Both the in-memory and Redis implementations satisfy this async contract, so
 // the API routes are backend-agnostic.
+// What the home page polls: the public feed plus the global active count
+// (raw, without the marketing floor — the route adds that).
+export type FeedSnapshot = {
+  activeUsers: number;
+  rooms: RoomPublic[];
+};
+
 export interface StoreBackend {
   getRoom(id: string): Promise<RoomPublic | null>;
   listActiveRooms(): Promise<RoomPublic[]>;
   countActivePeers(): Promise<number>; // across ALL rooms (visibility-blind)
+  // Both feed halves in one call, because every home-page visitor polls this
+  // every few seconds: a backend may serve it from a short-lived shared
+  // snapshot. The freshness contract is "a few seconds", never
+  // read-your-writes — the UI already tolerates that (a full room answers
+  // 409 on join, whatever the card said).
+  getFeed(): Promise<FeedSnapshot>;
   // Pre-create a room with no peers (the public-room flow: POST /api/rooms
   // writes the meta before the creator's first announce). Returns the meta as
   // actually STORED (sanitized/clamped) so the caller never echoes back values

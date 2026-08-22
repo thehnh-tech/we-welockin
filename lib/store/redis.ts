@@ -2,6 +2,7 @@ import { Redis } from "@upstash/redis";
 import { getRedisEnv } from "@/lib/env";
 import type {
   AnnounceInput,
+  FeedSnapshot,
   Peer,
   RoomMeta,
   RoomPublic,
@@ -35,6 +36,11 @@ const metaKey = (id: string) => `${P}room:${id}`;
 const peersKey = (id: string) => `${P}room:${id}:peers`;
 const namesKey = (id: string) => `${P}room:${id}:names`;
 const INDEX = `${P}rooms`;
+const FEED_KEY = `${P}feed`;
+
+// Feed snapshot TTL: 2-4s, jittered per write so multi-region deployments do
+// not expire (and rebuild) in lockstep.
+const feedTtlSec = () => 2 + Math.floor(Math.random() * 3);
 
 let client: Redis | null = null;
 function redis(): Redis {
@@ -106,13 +112,10 @@ function parsePeerEntry(raw: unknown, fallbackJoinedAt: number): PeerEntry {
   return { ...def, username: s || "Anon" };
 }
 
-// Drop stale peers from the sorted set + names hash, then return the live ones.
-async function readPeers(id: string, now: number): Promise<Peer[]> {
-  const r = redis();
-  const raw = await r.zrange<(string | number)[]>(peersKey(id), 0, -1, {
-    withScores: true,
-  });
-
+// Split a WITHSCORES zrange result into live members and stale ones (no
+// heartbeat within PEER_TIMEOUT_MS). Liveness always comes from the scores —
+// never from zcard, which would count the stale.
+function splitLive(raw: (string | number)[], now: number) {
   const live: { peerId: string; lastSeen: number }[] = [];
   const stale: string[] = [];
   for (let i = 0; i < raw.length; i += 2) {
@@ -121,14 +124,13 @@ async function readPeers(id: string, now: number): Promise<Peer[]> {
     if (now - lastSeen > PEER_TIMEOUT_MS) stale.push(peerId);
     else live.push({ peerId, lastSeen });
   }
+  return { live, stale };
+}
 
-  if (stale.length) {
-    await r.zrem(peersKey(id), ...stale);
-    await r.hdel(namesKey(id), ...stale);
-  }
-  if (live.length === 0) return [];
-
-  const names = (await r.hgetall<Record<string, unknown>>(namesKey(id))) ?? {};
+function toPeers(
+  live: { peerId: string; lastSeen: number }[],
+  names: Record<string, unknown>
+): Peer[] {
   return live.map((p) => {
     const entry = parsePeerEntry(names[p.peerId], p.lastSeen);
     return {
@@ -139,6 +141,24 @@ async function readPeers(id: string, now: number): Promise<Peer[]> {
       status: entry.status,
     };
   });
+}
+
+// Drop stale peers from the sorted set + names hash, then return the live ones.
+async function readPeers(id: string, now: number): Promise<Peer[]> {
+  const r = redis();
+  const raw = await r.zrange<(string | number)[]>(peersKey(id), 0, -1, {
+    withScores: true,
+  });
+
+  const { live, stale } = splitLive(raw, now);
+  if (stale.length) {
+    await r.zrem(peersKey(id), ...stale);
+    await r.hdel(namesKey(id), ...stale);
+  }
+  if (live.length === 0) return [];
+
+  const names = (await r.hgetall<Record<string, unknown>>(namesKey(id))) ?? {};
+  return toPeers(live, names);
 }
 
 function anyDeep(peers: Peer[]): boolean {
@@ -162,6 +182,74 @@ function publicView(meta: RoomMeta, peers: Peer[]): RoomPublic {
     deep: anyDeep(peers),
     peerNames: peers.slice(0, 4).map((p) => p.username),
   };
+}
+
+// Rebuild the shared feed snapshot from the index. Lock-free by design: at a
+// 2-4s TTL, the handful of pollers that race a rebuild each pay 3 pipelined
+// requests — cheaper and simpler than a reliable distributed lock, and wrong
+// for at most one snapshot generation.
+async function rebuildFeed(r: Redis, now: number): Promise<FeedSnapshot> {
+  const ids = await r.zrange<string[]>(INDEX, 0, MAX_LIST_ROOMS - 1, {
+    rev: true,
+  });
+  if (ids.length === 0) {
+    const empty: FeedSnapshot = { activeUsers: 0, rooms: [] };
+    await r.set(FEED_KEY, empty, { ex: feedTtlSec() });
+    return empty;
+  }
+
+  // Pass 1, every indexed room: meta + seat count. zcard may include peers up
+  // to PEER_TIMEOUT_MS stale — fine for a vanity counter.
+  const metaPipe = r.pipeline();
+  for (const id of ids) {
+    metaPipe.hgetall(metaKey(id));
+    metaPipe.zcard(peersKey(id));
+  }
+  const metaRes = await metaPipe.exec<(RawMeta | null | number)[]>();
+
+  let activeUsers = 0;
+  const dead: string[] = [];
+  const publicRooms: { id: string; meta: RoomMeta }[] = [];
+  ids.forEach((id, i) => {
+    const meta = parseMeta(id, metaRes[i * 2] as RawMeta | null, now);
+    if (!meta) {
+      // Metadata expired (TTL) — collect the dangling index entry. Without
+      // this pruning the index climbs toward MAX_ROOMS dead ids and every
+      // rebuild pays for all of them.
+      dead.push(id);
+      return;
+    }
+    activeUsers += Number(metaRes[i * 2 + 1]) || 0;
+    // The public/private split happens HERE, before any peers are read:
+    // most rooms are private and never shown, so their peer lists are never
+    // fetched at all.
+    if (meta.visibility === "public") publicRooms.push({ id, meta });
+  });
+  if (dead.length) await r.zrem(INDEX, ...dead);
+
+  // Pass 2, public rooms only: the peer lists behind the feed cards.
+  const rooms: RoomPublic[] = [];
+  if (publicRooms.length > 0) {
+    const peersPipe = r.pipeline();
+    for (const { id } of publicRooms) {
+      peersPipe.zrange(peersKey(id), 0, -1, { withScores: true });
+      peersPipe.hgetall(namesKey(id));
+    }
+    const peersRes = await peersPipe.exec<unknown[]>();
+    publicRooms.forEach(({ meta }, i) => {
+      const raw = (peersRes[i * 2] ?? []) as (string | number)[];
+      const names = (peersRes[i * 2 + 1] ?? {}) as Record<string, unknown>;
+      const peers = toPeers(splitLive(raw, now).live, names);
+      // Rooms with nobody (live) in them never show up in discovery.
+      if (peers.length > 0) rooms.push(publicView(meta, peers));
+    });
+  }
+
+  const snapshot: FeedSnapshot = { activeUsers, rooms };
+  // The SDK JSON-serializes the object itself — no manual stringify, or the
+  // read side would double-parse.
+  await r.set(FEED_KEY, snapshot, { ex: feedTtlSec() });
+  return snapshot;
 }
 
 export const redisBackend: StoreBackend = {
@@ -213,6 +301,16 @@ export const redisBackend: StoreBackend = {
       total += await r.zcard(peersKey(id));
     }
     return total;
+  },
+
+  async getFeed() {
+    const r = redis();
+    // Served from the shared snapshot: with V visitors polling every 4s this
+    // is what turns the feed from V full scans into 1 command per poll plus
+    // one pipelined rebuild every few seconds, whoever gets there first.
+    const cached = await r.get<FeedSnapshot>(FEED_KEY);
+    if (cached) return cached;
+    return rebuildFeed(r, Date.now());
   },
 
   async createRoom(inputMeta) {
@@ -296,16 +394,36 @@ export const redisBackend: StoreBackend = {
   },
 };
 
-// Best-effort fixed-window rate limit per IP for mutating routes. Deliberately
+// Best-effort fixed-window rate limit for mutating routes. Deliberately
 // generous so it only catches floods, not legit users behind a shared NAT.
-export async function redisAllow(
-  ip: string,
-  limit = 240,
-  windowSec = 60
+//
+// One pipelined request. EXPIRE NX runs on EVERY hit, not just the first:
+// paired with a bare INCR, a lost EXPIRE used to leave the counter without a
+// TTL — permanently rate-limiting the key (for a campus NAT, a whole
+// building) until someone deleted it by hand. NX makes the repair idempotent:
+// whichever hit lands after the loss re-arms the window.
+export function redisAllow(
+  key: string,
+  limit: number,
+  windowSec: number
+): Promise<boolean> {
+  return redisAllowMulti([{ key, limit, windowSec }]);
+}
+
+// Several windows charged in ONE pipelined request (a heartbeat pays a
+// per-seat budget and a per-address flood ceiling together). All must pass; a
+// request rejected by one window still consumed the others, which is the
+// pre-existing fixed-window semantic (rejected hits count).
+export async function redisAllowMulti(
+  entries: { key: string; limit: number; windowSec: number }[]
 ): Promise<boolean> {
   const r = redis();
-  const k = `${P}rl:${ip}`;
-  const n = await r.incr(k);
-  if (n === 1) await r.expire(k, windowSec);
-  return n <= limit;
+  const p = r.pipeline();
+  for (const e of entries) {
+    const k = `${P}rl:${e.key}`;
+    p.incr(k);
+    p.expire(k, e.windowSec, "NX");
+  }
+  const res = await p.exec<number[]>();
+  return entries.every((e, i) => Number(res[i * 2]) <= e.limit);
 }

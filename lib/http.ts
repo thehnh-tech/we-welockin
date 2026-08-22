@@ -52,6 +52,12 @@ export async function readJsonBody<T>(
   }
 }
 
-export function rateLimited(): NextResponse {
-  return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+// `retryAfterSec` is per call site — the windows behind this range from a
+// minute (heartbeats) to an hour (room creation), so no single default fits.
+export function rateLimited(retryAfterSec?: number): NextResponse {
+  const res = NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  if (retryAfterSec !== undefined) {
+    res.headers.set("Retry-After", String(retryAfterSec));
+  }
+  return res;
 }

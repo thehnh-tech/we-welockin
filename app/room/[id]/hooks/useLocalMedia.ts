@@ -23,7 +23,13 @@ export function useLocalMedia(enabled: boolean): {
     (async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 } },
+          // 20fps: study-room tiles are small and mostly still; the saving
+          // compounds across the 5 parallel encodes of a full mesh room.
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 20 },
+          },
           audio: true,
         });
       } catch (e) {

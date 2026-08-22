@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  allowMutation,
-  countActivePeers,
-  createRoom,
-  listActiveRooms,
-  type RoomMeta,
-} from "@/lib/store";
+import { allowMutation, createRoom, getFeed, type RoomMeta } from "@/lib/store";
 import { DEFAULT_DURATION_SEC } from "@/lib/store/sanitize";
 import { generateRoomId } from "@/lib/roomCode";
 import { VERIFIED_COOKIE, verifyVerifiedToken } from "@/lib/verify/token";
@@ -22,16 +16,21 @@ const BASE_ACTIVE_USERS = 130;
 // How long a public session stays in the analytics archive.
 const ARCHIVE_TTL_MS = 180 * 24 * 3600 * 1000; // 180 days
 
-// The home page polls this: active-user counter + the public feed.
+// The home page polls this: active-user counter + the public feed. The answer
+// is identical for every caller and a few seconds of staleness is fine, so it
+// is doubly shared: served from the store's snapshot, and cached at the CDN
+// so V pollers cost ~1 origin hit per few seconds per region (next.config.mjs
+// exempts exactly this path from the blanket no-store on /api).
 export async function GET() {
-  const [active, rooms] = await Promise.all([
-    countActivePeers(),
-    listActiveRooms(),
-  ]);
-  return NextResponse.json({
-    activeUsers: BASE_ACTIVE_USERS + active,
-    rooms,
-  });
+  const { activeUsers, rooms } = await getFeed();
+  return NextResponse.json(
+    { activeUsers: BASE_ACTIVE_USERS + activeUsers, rooms },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=3, stale-while-revalidate=10",
+      },
+    }
+  );
 }
 
 // The ONLY way a room comes into existence. Ids are minted here, never
