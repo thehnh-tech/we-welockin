@@ -438,9 +438,48 @@ public (donnée volontairement publique), jumeaux d'id par casse (désormais imp
 profond forgeant l'identité d'une room (le serveur fait autorité), email dans `public_sessions`
 (jamais relu ni exposé).
 
-**Reste ouvert (décision produit) :** un id de room publique est visible sur le feed et
-réutilisable après l'expiration des métadonnées (120 s), donc quelqu'un peut créer une room
-**privée** à cet id et attendre. Corriger demande de réserver les ids après usage — à trancher.
+**Reste ouvert (traité en Phase 10) :** un id de room publique est visible sur le feed et
+réutilisable après l'expiration des métadonnées (120 s).
 
 **État final :** `tsc --noEmit` ✅ · `eslint` ✅ (0 erreur, 7 warnings préexistants) ·
 **119 tests** ✅ · `next build` ✅.
+
+---
+
+## Phase 10 — Création centralisée, routes durcies (le modèle éphémère est conservé) ✅ FAIT
+
+**Décision produit :** les rooms **restent éphémères**. Ce qui change n'est pas leur durée de
+vie mais **qui peut en faire naître une**.
+
+- [x] **`POST /api/rooms` est le seul chemin de création**, et il **frappe l'id lui-même** :
+      un appelant ne peut plus choisir d'identifiant. `announce` ne crée plus rien et répond
+      **404** sur une room inconnue. Conséquence directe : plus personne ne peut créer une room
+      à un id lu sur le feed puis attendre les étudiants qui reviennent sur un ancien lien —
+      la classe d'attaque disparaît sans toucher au caractère éphémère. Un lien mort dit
+      « cette room est terminée » au lieu de rouvrir chez quelqu'un d'autre.
+- [x] **Le heartbeat ne transporte plus que de la présence.** `AnnounceInput` perd `name`,
+      `subject`, `durationSec`, `startedAt`, `visibility`, `institution` : l'identité d'une room
+      est figée à la création et lue depuis le store. Il n'y a donc plus rien sur ce chemin
+      qu'un client puisse falsifier — et les trois backends perdent chacun leur branche
+      « créer si absent » (y compris la résurrection Mongo, désormais sans objet).
+- [x] **Les liens ne portent plus que l'id.** `lib/roomLink.ts` (paramètres `n/d/s/sub/p`) est
+      **supprimé** : un lien forgé ne peut plus décrire une room inexistante ni en travestir une
+      vraie. `useRoomMeta` interroge toujours le serveur — source unique de vérité.
+- [x] **Route morte supprimée** — `GET /api/rooms/[id]/peers` n'était appelée par aucun client
+      et exposait les pseudos de la room.
+- [x] **Plafond dédié à la création** (30/h/IP) : créer consomme un slot du cap global
+      `MAX_ROOMS`, donc un créateur non limité pouvait le saturer et empêcher tout le monde de
+      démarrer une session.
+- [x] **En-têtes de sécurité** (`next.config.mjs`) — `frame-ancestors 'none'` + `X-Frame-Options`
+      (l'app demande caméra et micro : être encadrable est dangereux), `Permissions-Policy`
+      confinant caméra/micro/partage d'écran à cette origine, `nosniff`,
+      `strict-origin-when-cross-origin` pour qu'une URL de room ne fuite jamais dans un
+      `Referer`, et `no-store` sur `/api/*`.
+
+Vérifié en conditions réelles : création d'une room à un id choisi via heartbeat → 404 et
+aucune room créée ; id imposé au corps de la requête → ignoré, id serveur ; réécriture de
+l'identité par heartbeat → sans effet ; les quatre en-têtes présents ; route morte en 405 ;
+lien mort → « This room has ended ».
+
+**État final :** `tsc --noEmit` ✅ · `eslint` ✅ (0 erreur, 6 warnings préexistants) ·
+**108 tests** ✅ · `next build` ✅.

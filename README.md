@@ -24,7 +24,8 @@ Video study rooms with a shared focus timer. Next.js + WebRTC mesh via PeerJS.
   calls every other peer). PeerJS's free public cloud handles signaling, so the
   app stays fully serverless-friendly on Vercel.
 - **Peer presence** is announced every 4s via simple REST endpoints — no
-  WebSocket server needed.
+  WebSocket server needed. The heartbeat carries presence only; a room's
+  identity is fixed at creation and read from the store.
 
 ## University verification & the public feed
 
@@ -112,6 +113,15 @@ Who may do what, and what enforces it:
 | Join | anyone with the code | verified university email |
 | Seats | 6 | 6 |
 
+**Rooms are ephemeral, and creation is centralized.** `POST /api/rooms` is the
+only way a room comes into existence, and it mints the id — a caller cannot
+choose one. A heartbeat to an unknown id is a 404, never a new room. So a room
+still vanishes when everyone leaves (TTL ~120s, refreshed by heartbeats), but
+its link dies with it instead of quietly reopening as somebody else's room at
+the same address. Links carry nothing but the id: no name, no timer, no
+visibility, so a crafted link cannot describe a room into existence or
+misdescribe a real one.
+
 The three properties worth knowing:
 
 - **The code is the credential** for a private room, so guessing it must be
@@ -129,9 +139,13 @@ The three properties worth knowing:
   from outside.
 
 Mutating routes are body-size capped; room ids are restricted to
-`[a-z0-9-]` before they reach a storage key. Public-room creation is
-additionally capped per verified account, and the verification endpoints
-carry their own per-IP and per-email limits.
+`[a-z0-9-]` before they reach a storage key. Room creation carries a tight
+per-IP budget of its own (it consumes a slot in the global room cap) and an
+extra per-account one for public rooms; the verification endpoints have their
+own per-IP and per-email limits. Security headers (`frame-ancestors 'none'`,
+a `Permissions-Policy` confining camera/mic to this origin, `nosniff`,
+`strict-origin-when-cross-origin` so a room URL never leaks in a `Referer`,
+and `no-store` on the API) are set in `next.config.mjs`.
 
 ## Limits
 

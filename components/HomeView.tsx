@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getPseudo, setPseudo } from "@/lib/cookies";
-import { buildRoomUrl } from "@/lib/roomLink";
-import { generateRoomId, normalizeRoomCode } from "@/lib/roomCode";
+import { normalizeRoomCode } from "@/lib/roomCode";
 import { formatShortDuration } from "@/lib/time";
 import { getStreakDays, getTodaySeconds, getWeekSeconds } from "@/lib/stats";
 import { ROOMS_POLL_MS } from "@/lib/constants";
@@ -130,64 +129,45 @@ export default function HomeView() {
     setPseudoState(v);
   };
 
+  // Both kinds of room are created by the server, which mints the id. Nothing
+  // about a room — its name, timer, visibility — is ever carried in the link,
+  // so a link cannot describe a room into existence or misdescribe one.
   const createRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    const name = newName.trim() || "Study session";
-    const durationSec = Math.max(60, Math.min(8 * 3600, resolvedMinutes * 60));
+    if (publishing) return;
+    if (visibility === "public" && !verify.verified) return;
 
-    if (visibility === "public") {
-      // Public rooms are created server-side: only a verified university
-      // cookie may put a room on the feed.
-      if (!verify.verified || publishing) return;
-      setPublishing(true);
-      setPublishError(null);
-      try {
-        const res = await fetch("/api/rooms", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name,
-            subject: newSubject.trim(),
-            durationSec,
-            visibility: "public",
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.room) {
-          if (res.status === 401) {
-            setVerify({ loaded: true, verified: false, institution: "" });
-            setPublishError("Your verification expired — verify again below.");
-          } else {
-            setPublishError("Couldn't create the room. Try again.");
-          }
-          return;
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      const res = await fetch("/api/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newName.trim() || "Study session",
+          subject: newSubject.trim(),
+          durationSec: Math.max(60, Math.min(8 * 3600, resolvedMinutes * 60)),
+          visibility,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.room) {
+        if (res.status === 401) {
+          setVerify({ loaded: true, verified: false, institution: "" });
+          setPublishError("Your verification expired — verify again below.");
+        } else if (res.status === 429) {
+          setPublishError("You've started a lot of rooms — try again later.");
+        } else {
+          setPublishError("Couldn't create the room. Try again.");
         }
-        // Bare URL on purpose: the room already exists server-side, so the
-        // room page fetches its metadata — including the institution, which
-        // the deep-link contract cannot carry. Deep-link params here would
-        // hide the institution chip from the creator and from anyone they
-        // share the copied link with.
-        router.push(`/room/${encodeURIComponent(data.room.id)}`);
-      } catch {
-        setPublishError("Network error — try again.");
-      } finally {
-        setPublishing(false);
+        return;
       }
-      return;
+      router.push(`/room/${encodeURIComponent(data.room.id)}`);
+    } catch {
+      setPublishError("Network error — try again.");
+    } finally {
+      setPublishing(false);
     }
-
-    // Private rooms: unchanged client-side flow — instant, no account, the
-    // room materializes on the first announce.
-    router.push(
-      buildRoomUrl({
-        id: generateRoomId(),
-        name,
-        durationSec,
-        startedAt: Date.now(),
-        subject: newSubject.trim() || undefined,
-        visibility: "private",
-      })
-    );
   };
 
   const joinByCode = (e: React.FormEvent) => {

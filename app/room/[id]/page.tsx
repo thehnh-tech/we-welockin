@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { getPseudo } from "@/lib/cookies";
 import { displayRoomCode } from "@/lib/roomCode";
 import { usePrefs } from "@/lib/prefs";
@@ -70,7 +70,6 @@ function ControlPill({
 
 function RoomInner() {
   const params = useParams<{ id: string }>();
-  const searchParams = useSearchParams();
   const roomId = params.id;
   const router = useRouter();
 
@@ -92,14 +91,7 @@ function RoomInner() {
     setPseudoState(p);
   }, [router]);
 
-  const { room, roomError } = useRoomMeta(
-    roomId,
-    searchParams?.get("n") ?? null,
-    searchParams?.get("d") ?? null,
-    searchParams?.get("s") ?? null,
-    searchParams?.get("sub") ?? null,
-    searchParams?.get("p") ?? null
-  );
+  const { room, roomError } = useRoomMeta(roomId);
 
   // One live session per device: probe other tabs before touching the camera.
   const { ready: deviceReady, blocked } = useDeviceGuard(roomId);
