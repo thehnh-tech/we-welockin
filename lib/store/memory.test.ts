@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { memoryBackend } from "./memory";
+import { ROOM_CAPACITY } from "./sanitize";
 
 // Each test uses a unique room id since the backend shares a process-global map.
 let n = 0;
@@ -250,6 +251,49 @@ describe("memoryBackend", () => {
     });
     const listed = await memoryBackend.listActiveRooms();
     expect(listed.find((r) => r.id === id)).toBeUndefined();
+  });
+
+  it("seats exactly ROOM_CAPACITY people and reports the refusal", async () => {
+    const id = rid();
+    for (let i = 0; i < ROOM_CAPACITY; i++) {
+      const res = await memoryBackend.announce({
+        roomId: id,
+        peerId: `p${i}`,
+        username: `U${i}`,
+      });
+      expect(res.joined).toBe(true);
+    }
+    const overflow = await memoryBackend.announce({
+      roomId: id,
+      peerId: "one-too-many",
+      username: "Late",
+    });
+    // Silence here would strand the newcomer in a room nobody can see them in.
+    expect(overflow.joined).toBe(false);
+    expect(overflow.peers.map((p) => p.peerId)).not.toContain("one-too-many");
+
+    const room = await memoryBackend.getRoom(id);
+    expect(room?.peerCount).toBe(ROOM_CAPACITY);
+    expect(room?.capacity).toBe(ROOM_CAPACITY);
+  });
+
+  it("lets an existing member heartbeat even when the room is full", async () => {
+    const id = rid();
+    for (let i = 0; i < ROOM_CAPACITY; i++) {
+      await memoryBackend.announce({
+        roomId: id,
+        peerId: `p${i}`,
+        username: `U${i}`,
+      });
+    }
+    // The cap must never evict someone who already holds a seat.
+    const beat = await memoryBackend.announce({
+      roomId: id,
+      peerId: "p0",
+      username: "U0",
+    });
+    expect(beat.joined).toBe(true);
+    expect(beat.peers).toHaveLength(ROOM_CAPACITY);
   });
 
   it("counts active peers across all rooms, private included", async () => {

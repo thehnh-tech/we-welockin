@@ -11,10 +11,14 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getPseudo } from "@/lib/cookies";
 import { displayRoomCode } from "@/lib/roomCode";
 import { usePrefs } from "@/lib/prefs";
+import { useVerified } from "@/lib/useVerified";
+import { ROOM_CAPACITY } from "@/lib/store/sanitize";
 import VideoTile from "@/components/VideoTile";
 import Timer from "@/components/Timer";
 import CrewSidebar from "@/components/CrewSidebar";
 import SettingsMenu from "@/components/SettingsMenu";
+import Padlock from "@/components/Padlock";
+import VerifyUniversity from "@/components/VerifyUniversity";
 import { useRoomMeta } from "./hooks/useRoomMeta";
 import { useLocalMedia } from "./hooks/useLocalMedia";
 import { usePeerMesh, type PeerStatus } from "./hooks/usePeerMesh";
@@ -100,8 +104,17 @@ function RoomInner() {
   // One live session per device: probe other tabs before touching the camera.
   const { ready: deviceReady, blocked } = useDeviceGuard(roomId);
 
+  // A public room is open to the whole feed, so the university check guards
+  // joining it, not just creating it. This is the UI half; the server refuses
+  // the announce regardless of what the client believes.
+  const [verify, setVerify] = useVerified(!!pseudo);
+  const needsVerification =
+    room?.visibility === "public" && verify.loaded && !verify.verified;
+
   const { localStream, mediaError, muted, camOff, toggleMute, toggleCam } =
-    useLocalMedia(!!pseudo && !!room && deviceReady && !blocked);
+    useLocalMedia(
+      !!pseudo && !!room && deviceReady && !blocked && !needsVerification
+    );
 
   const away = useAway();
   const effectiveMuted = muted || deep;
@@ -130,6 +143,7 @@ function RoomInner() {
     remotes,
     roster,
     banner,
+    blockedReason,
     dismissWarning,
     refreshStatus,
   } = usePeerMesh({ roomId, pseudo, room, localStream, statusRef });
@@ -231,6 +245,82 @@ function RoomInner() {
               className="wl-lift rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface"
             >
               Reload
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="wl-lift rounded-full border border-strong bg-surface px-5 py-2.5 text-sm font-semibold text-ink2"
+            >
+              Home
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Public room, unverified visitor: offer the check right here rather than
+  // bouncing them home and making them find their way back. The mesh's own
+  // 403 lands here too, so a cookie that expires mid-session reopens the gate
+  // instead of silently dropping presence.
+  if (needsVerification || blockedReason === "verification") {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <div className="w-full max-w-md space-y-4 rounded-[20px] border border-hairline bg-surface p-7 shadow-modal animate-wl-rise">
+          <div className="flex items-center gap-2 text-ink">
+            <Padlock size={22} locked />
+            <span className="text-[15px] font-bold tracking-tight">
+              welock<span className="text-accentink">.in</span>
+            </span>
+          </div>
+          <div>
+            <h1
+              className="text-[22px] font-bold text-ink"
+              style={{ letterSpacing: "-0.02em" }}
+            >
+              {room?.name ? `"${room.name}" is a public room` : "Public room"}
+            </h1>
+            <p className="mt-1 text-sm text-text2">
+              Public rooms are students only. Verify your university email
+              once, and you can join any of them.
+            </p>
+          </div>
+          <VerifyUniversity
+            onVerified={(v) =>
+              setVerify({
+                loaded: true,
+                verified: true,
+                institution: v.institution,
+              })
+            }
+          />
+          <button
+            onClick={() => router.push("/")}
+            className="wl-lift w-full rounded-full border border-strong bg-surface py-2.5 text-sm font-semibold text-ink2"
+          >
+            Back home
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (blockedReason === "full") {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <div className="w-full max-w-sm rounded-[20px] border border-hairline bg-surface p-8 text-center shadow-md animate-wl-rise">
+          <p className="mb-2 text-[17px] font-bold text-ink">
+            This room is full
+          </p>
+          <p className="mb-5 text-sm text-text2">
+            A room seats {ROOM_CAPACITY} people — video stays sharp only while
+            everyone fits. Try again in a bit, or start your own.
+          </p>
+          <div className="flex justify-center gap-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="wl-lift rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface"
+            >
+              Try again
             </button>
             <button
               onClick={() => router.push("/")}

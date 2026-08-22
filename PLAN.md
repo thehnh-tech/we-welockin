@@ -383,3 +383,64 @@ du sitemap.
 
 **État final :** `tsc --noEmit` ✅ · `eslint` ✅ (0 erreur, 7 warnings préexistants) ·
 **99 tests** ✅ · `next build` ✅.
+
+---
+
+## Phase 9 — Rejoindre = vérifié, capacité, codes courts, durcissement des accès ✅ FAIT
+
+- [x] **Rejoindre une room publique exige la vérification** (plus seulement la créer).
+      Appliqué **côté serveur** dans `POST /api/rooms/[id]/peers` : la visibilité est relue
+      depuis le **store**, donc mentir dans le corps de la requête ne change rien (vérifié :
+      `visibility:"private"` forgé → toujours 403). Côté UI, la page de room affiche une
+      barrière de vérification en ligne **avant d'ouvrir la caméra**, plutôt que de renvoyer
+      l'étudiant à l'accueil.
+- [x] **Capacité affichée et appliquée** — `ROOM_CAPACITY = 6`, la vraie limite d'un mesh
+      WebRTC. Le feed montre `3/6`, une room pleine n'est plus cliquable, et le 7ᵉ reçoit un
+      **409 `room_full`** avec un écran dédié au lieu d'un silence qui ressemble à une panne.
+      Un membre déjà assis n'est jamais évincé par le plafond.
+- [x] **Codes simplifiés** — plus de préfixe `focus-` : `7Q2XKM`. Six caractères au lieu de
+      cinq pour compenser l'entropie que le préfixe (constant, donc nulle) n'apportait pas :
+      31⁶ ≈ 887 M. Les anciens ids `focus-xxxxx` restent résolus, donc les liens partagés
+      continuent de fonctionner.
+
+### Audit adversarial de l'accès par lien (28 agents) — 11 confirmés, 13 réfutés
+
+- [x] **[CRITIQUE] `DELETE /api/rooms/[id]/peers` sans aucune authentification** — n'importe
+      qui pouvait éjecter n'importe quel participant, en boucle, depuis l'extérieur de la room
+      (les peerIds sont distribués à tous les membres par le mesh). **Jeton de pair** (HMAC de
+      `room:peer`) émis au premier announce et exigé pour partir.
+- [x] **[HAUT] Usurpation d'identité par peerId** — réannoncer l'id d'un autre écrasait son
+      entrée (pseudo, statut, tuile vidéo). Même jeton exigé pour revendiquer un id déjà présent.
+- [x] **[HAUT] Énumération des codes non limitée** — `GET /api/rooms/[id]` et `GET .../peers`
+      n'avaient **aucune** limite : le code d'une room privée était devinable à la vitesse du
+      réseau, et un succès donne caméra + micro. Limiteur de lecture ajouté (300/min/IP), et le
+      commentaire de `roomCode.ts` qui invoquait une protection inexistante a été corrigé.
+- [x] **[HAUT] Ids de room non filtrés** — `sanitizeRoomId` ne faisait que tronquer, donc un
+      `:` permettait de viser l'espace de clés Redis d'une autre room. Restreint à `[a-z0-9-]`,
+      minuscules, 32 caractères ; les routes rejettent un id vide.
+- [x] **[MOYEN] `X-Forwarded-For` de confiance** — le premier élément est fourni par le client,
+      donc **toutes** les limites par IP se réinitialisaient avec un en-tête. Bascule sur
+      `x-real-ip`, puis l'élément le plus à droite (celui ajouté par notre proxy).
+- [x] **Limiteur inopérant sans Redis** — `allowMutation` renvoyait `true` inconditionnellement
+      en mode mémoire. Il utilise désormais le limiteur en process.
+- [x] **Deux défauts trouvés en corrigeant** : le client interprétait *tout* 409 comme « room
+      pleine » (un conflit d'id aurait affiché un faux « complet »), et les announces
+      concurrents pouvaient se marcher dessus — sérialisés, et le 429 a désormais son propre
+      message au lieu de « lien invalide ».
+
+Vérifié en rejouant chaque attaque contre le serveur corrigé : éviction anonyme 403, éviction
+avec jeton forgé 403, usurpation 409, injection `:` neutralisée, énumération throttlée — et le
+membre légitime bat et quitte normalement.
+
+Réfutés (non corrigés, à raison) : occupation des 6 sièges par un anonyme (le gating publique
+le bloque), auto-réponse WebRTC (le peerId requis n'est distribué qu'aux membres), fuite du feed
+public (donnée volontairement publique), jumeaux d'id par casse (désormais impossible), lien
+profond forgeant l'identité d'une room (le serveur fait autorité), email dans `public_sessions`
+(jamais relu ni exposé).
+
+**Reste ouvert (décision produit) :** un id de room publique est visible sur le feed et
+réutilisable après l'expiration des métadonnées (120 s), donc quelqu'un peut créer une room
+**privée** à cet id et attendre. Corriger demande de réserver les ids après usage — à trancher.
+
+**État final :** `tsc --noEmit` ✅ · `eslint` ✅ (0 erreur, 7 warnings préexistants) ·
+**119 tests** ✅ · `next build` ✅.

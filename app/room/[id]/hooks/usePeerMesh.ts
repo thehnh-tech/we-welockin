@@ -22,6 +22,10 @@ export type RosterEntry = {
 
 export type Remote = { username: string; stream: MediaStream };
 
+// Why the server refused to seat us. Not a transient warning: neither clears
+// on its own, so the room page swaps the whole view for an explanation.
+export type BlockedReason = "verification" | "full" | null;
+
 const STALL_HINT =
   "Can't reach the others on this network — some Wi-Fi networks (office, 4G) block video. Try another network.";
 
@@ -41,6 +45,7 @@ export function usePeerMesh(opts: {
   remotes: Map<string, Remote>;
   roster: RosterEntry[];
   banner: string | null;
+  blockedReason: BlockedReason;
   dismissWarning: () => void;
   refreshStatus: () => void;
 } {
@@ -53,6 +58,7 @@ export function usePeerMesh(opts: {
   const [othersCount, setOthersCount] = useState(0);
   const [connWarning, setConnWarning] = useState<string | null>(null);
   const [stalled, setStalled] = useState(false);
+  const [blockedReason, setBlockedReason] = useState<BlockedReason>(null);
 
   const roomRef = useRef<RoomMeta | null>(room);
   useEffect(() => {
@@ -75,11 +81,22 @@ export function usePeerMesh(opts: {
     const peerUsernames = new Map<string, string>();
     const peerLastSeen = new Map<string, number>();
 
+    // Proof that this peer id is ours, minted by the server on our first
+    // announce. Sent back on every later announce and on leaving, so nobody
+    // else in the room can adopt our id or evict us with it.
+    let peerToken: string | null = null;
+    let inFlight = false;
+
     // One round-trip does double duty: it refreshes our presence (heartbeat,
     // including live status) and returns the current peer list, so there is no
     // separate poll loop.
+    //
+    // Calls are serialized: a status change can fire this while the heartbeat
+    // is still open, and two announces racing for the same peer id would have
+    // the second one rejected as an impersonation attempt.
     const announce = async () => {
-      if (!myId) return;
+      if (!myId || inFlight) return;
+      inFlight = true;
       const r = roomRef.current;
       try {
         const res = await fetch(`/api/rooms/${roomId}/peers`, {
@@ -87,6 +104,7 @@ export function usePeerMesh(opts: {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             peerId: myId,
+            peerToken,
             username: pseudo,
             name: r?.name,
             subject: r?.subject,
@@ -97,10 +115,34 @@ export function usePeerMesh(opts: {
           }),
         });
         if (!res.ok) {
-          // 4xx is deterministic (413 forged oversized link, 429 rate limit…):
-          // surface it instead of failing presence silently. 5xx stays quiet —
-          // transient server errors resolve on the next heartbeat.
-          if (res.status >= 400 && res.status < 500 && !cancelled) {
+          if (cancelled) return;
+          // These mean the session cannot proceed at all, so they get a screen
+          // of their own rather than a dismissible banner.
+          if (res.status === 403) {
+            setBlockedReason("verification");
+            return;
+          }
+          if (res.status === 409) {
+            // 409 covers two different answers: the room is full, or this peer
+            // id is already claimed by someone holding its token. Only the
+            // first is terminal — a contested id resolves on the next beat.
+            const why = await res.json().catch(() => ({}));
+            if (why?.error === "room_full") setBlockedReason("full");
+            else console.error("announce conflict", why?.error);
+            return;
+          }
+          // Throttling is transient — the next beat gets through, so say so
+          // rather than blaming the link.
+          if (res.status === 429) {
+            setConnWarning(
+              "Too many people on this network right now. Reconnecting…"
+            );
+            return;
+          }
+          // Other 4xx are deterministic (413 forged oversized link, 400 bad
+          // room id…): surface them instead of failing presence silently. 5xx
+          // stays quiet — transient server errors resolve on the next beat.
+          if (res.status >= 400 && res.status < 500) {
             console.error("announce rejected", res.status);
             setConnWarning(
               "This link looks invalid. Reload the page or ask for a fresh one."
@@ -109,8 +151,13 @@ export function usePeerMesh(opts: {
           return;
         }
         const data = await res.json();
+        if (typeof data.peerToken === "string") peerToken = data.peerToken;
         onPeers(data.peers ?? []);
-      } catch {}
+      } catch {
+        // Network blip: stay quiet, the next heartbeat retries.
+      } finally {
+        inFlight = false;
+      }
     };
     announceNowRef.current = announce;
 
@@ -271,9 +318,10 @@ export function usePeerMesh(opts: {
           peer.destroy();
         } catch {}
       }
-      if (myId) {
+      if (myId && peerToken) {
         try {
-          fetch(`/api/rooms/${roomId}/peers?peerId=${myId}`, {
+          const qs = new URLSearchParams({ peerId: myId, token: peerToken });
+          fetch(`/api/rooms/${roomId}/peers?${qs}`, {
             method: "DELETE",
             keepalive: true,
           });
@@ -305,6 +353,7 @@ export function usePeerMesh(opts: {
     remotes,
     roster,
     banner,
+    blockedReason,
     dismissWarning,
     refreshStatus,
   };

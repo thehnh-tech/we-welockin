@@ -21,8 +21,8 @@ import type {
 } from "./types";
 import {
   MAX_LIST_ROOMS,
-  MAX_PEERS_PER_ROOM,
   MAX_ROOMS,
+  ROOM_CAPACITY,
   PEER_TIMEOUT_MS,
   ROOM_TTL_SEC,
   sanitizeDuration,
@@ -106,7 +106,7 @@ async function readLivePeers(
 ): Promise<Peer[]> {
   const docs = await peersCol(db)
     .find({ roomId, lastSeen: { $gt: now - PEER_TIMEOUT_MS } })
-    .limit(MAX_PEERS_PER_ROOM * 2)
+    .limit(ROOM_CAPACITY * 4)
     .toArray();
   return docs.map(docToPeer);
 }
@@ -115,6 +115,7 @@ function publicView(meta: RoomMeta, peers: Peer[]): RoomPublic {
   return {
     ...meta,
     peerCount: peers.length,
+    capacity: ROOM_CAPACITY,
     deep: peers.some((p) => p.status.deep),
     peerNames: peers.slice(0, 4).map((p) => p.username),
   };
@@ -258,8 +259,10 @@ export const mongoBackend: StoreBackend = {
       roomId,
       lastSeen: { $gt: now - PEER_TIMEOUT_MS },
     });
-    // Soft per-room cap: silently skip a brand-new peer once full.
-    if (existing || liveCount < MAX_PEERS_PER_ROOM) {
+    // Members always get back in (a heartbeat must never be evicted by the
+    // cap); a newcomer only when there is a free seat.
+    const joined = !!existing || liveCount < ROOM_CAPACITY;
+    if (joined) {
       await peersCol(db).updateOne(
         { roomId, peerId },
         {
@@ -276,7 +279,7 @@ export const mongoBackend: StoreBackend = {
     }
 
     const peers = await readLivePeers(db, roomId, now);
-    return { peers, room: meta };
+    return { peers, room: meta, joined };
   },
 
   async removePeer(roomId, peerId) {

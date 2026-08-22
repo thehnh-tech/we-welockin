@@ -3,10 +3,21 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+// The client IP, for rate limiting. Order matters: x-real-ip is written by the
+// hosting proxy and cannot be spoofed from outside, whereas X-Forwarded-For is
+// a list a client may prefill. Reading its LEFTMOST entry — the conventional
+// choice — takes the attacker's own value, so every per-IP budget could be
+// reset with one header. The rightmost entry is the one our proxy appended,
+// so that is the only part of the chain worth trusting.
 export function clientIp(req: NextRequest): string {
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
   const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
+  if (xff) {
+    const hops = xff.split(",");
+    return hops[hops.length - 1].trim();
+  }
+  return "unknown";
 }
 
 export type JsonBody<T> =

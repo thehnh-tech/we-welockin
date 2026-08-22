@@ -6,8 +6,8 @@ import type {
   StoreBackend,
 } from "./types";
 import {
-  MAX_PEERS_PER_ROOM,
   MAX_ROOMS,
+  ROOM_CAPACITY,
   PEER_TIMEOUT_MS,
   ROOM_GRACE_MS,
   sanitizeDuration,
@@ -80,6 +80,7 @@ function toPublic(room: MemRoom): RoomPublic {
     visibility: room.visibility,
     institution: room.institution,
     peerCount: room.peers.size,
+    capacity: ROOM_CAPACITY,
     deep: anyDeep(room),
     peerNames: Array.from(room.peers.values(), (p) => p.username).slice(0, 4),
   };
@@ -171,9 +172,11 @@ export const memoryBackend: StoreBackend = {
 
     const peerId = sanitizePeerId(input.peerId);
     cleanupRoom(room, now);
-    // Soft per-room cap: silently skip registering a brand-new peer once full.
+    // Members always get back in (a heartbeat must never be evicted by the
+    // cap); a newcomer only when there is a free seat.
     const existing = room.peers.get(peerId);
-    if (existing || room.peers.size < MAX_PEERS_PER_ROOM) {
+    const joined = !!existing || room.peers.size < ROOM_CAPACITY;
+    if (joined) {
       room.peers.set(peerId, {
         peerId,
         username: sanitizeUsername(input.username),
@@ -184,7 +187,11 @@ export const memoryBackend: StoreBackend = {
       room.emptySince = null;
     }
 
-    return { peers: Array.from(room.peers.values()), room: toMeta(room) };
+    return {
+      peers: Array.from(room.peers.values()),
+      room: toMeta(room),
+      joined,
+    };
   },
 
   async removePeer(roomId, peerId) {

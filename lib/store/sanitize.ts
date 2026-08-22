@@ -5,7 +5,11 @@ export const PEER_TIMEOUT_MS = 30_000; // a peer is stale after this without a h
 export const ROOM_TTL_SEC = 120; // Redis key TTL, refreshed on each announce
 export const ROOM_GRACE_MS = 120_000; // keep an empty room (in-memory) this long
 export const MAX_ROOMS = 500; // global cap (DoS guard)
-export const MAX_PEERS_PER_ROOM = 20; // per-room cap (mesh tops out ~6 anyway)
+// How many people fit in one room. This is the real ceiling of a WebRTC mesh
+// (every peer streams to every other, so upload grows with the room) — past
+// this the call degrades for everyone. It is shown in the UI, so it has to be
+// the number actually enforced, not an aspirational one.
+export const ROOM_CAPACITY = 6;
 export const MAX_LIST_ROOMS = 100; // cap the discovery scan
 export const DEFAULT_DURATION_SEC = 1500; // 25 min
 
@@ -93,6 +97,16 @@ export function sanitizePeerId(peerId: string | undefined): string {
   return (peerId ?? "").toString().slice(0, 64);
 }
 
+// Room ids are used to build storage keys (Redis "wlis:room:{id}:peers",
+// Mongo _id), so they must be a closed character set — a ":" in an id would
+// let a crafted code reach into a neighbouring key namespace and corrupt
+// another room's presence data. Lowercasing also means a code typed in caps
+// reaches the same room rather than silently opening an empty twin.
+// Returns "" for anything with no usable characters; callers reject that.
 export function sanitizeRoomId(roomId: string | undefined): string {
-  return (roomId ?? "").toString().slice(0, 64);
+  return (roomId ?? "")
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "")
+    .slice(0, 32);
 }

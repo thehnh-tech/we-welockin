@@ -27,18 +27,42 @@ export const removePeer = (roomId: string, peerId: string) =>
   backend.removePeer(roomId, peerId);
 export const listPeers = (roomId: string) => backend.listPeers(roomId);
 
-// Best-effort per-IP rate limit for mutating routes. No-op on the in-memory
-// backend (single-instance dev), and an outage must never take the app down.
-export async function allowMutation(ip: string): Promise<boolean> {
+// Per-IP rate limits. Both paths need one: a room code is the only credential
+// a private room has, so an unmetered read endpoint is an offline-speed
+// guessing oracle against it. The in-memory limiter is used when no shared
+// store is configured — weaker across instances than a shared counter, but far
+// better than the previous unconditional `true`.
+async function allow(
+  key: string,
+  limit: number,
+  windowSec: number
+): Promise<boolean> {
   if (isRedisConfigured()) {
     try {
-      return await redisAllow(ip);
+      return await redisAllow(key, limit, windowSec);
     } catch {
-      return true;
+      return true; // never let a limiter outage take down the app
     }
   }
-  if (isMongoConfigured()) {
-    return allowVerify(`rl:${ip}`, 240, 60); // fail-open inside
-  }
-  return true;
+  return allowVerify(`rl:${key}`, limit, windowSec); // fail-open inside
+}
+
+// Budgets are set against the worst legitimate case, which is a university
+// NAT: hundreds of students can share one address, and each peer heartbeats
+// every 4s (15 writes/min). Too tight and a whole campus locks itself out —
+// so these are generous, and lean on the code's 887M-wide id space to make
+// guessing impractical rather than on a small per-minute number.
+
+// Writes: creating rooms, announcing presence, leaving. ~40 concurrent peers
+// per shared address.
+export function allowMutation(ip: string): Promise<boolean> {
+  return allow(`mut:${ip}`, 600, 60);
+}
+
+// Reads: room lookup and roster — one or two per person per session, so this
+// is orders of magnitude above real use. It exists to bound id-space walking:
+// at this rate, stumbling onto any live room takes weeks of sustained,
+// conspicuous traffic.
+export function allowRead(ip: string): Promise<boolean> {
+  return allow(`read:${ip}`, 300, 60);
 }
