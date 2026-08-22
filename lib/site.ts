@@ -1,10 +1,26 @@
 // Single source of truth for the site's public identity (SEO, manifest,
-// emails). NEXT_PUBLIC_SITE_URL overrides the canonical origin in
-// non-production deployments (previews, staging).
+// emails). Server-only — every importer is a server component, so plain
+// (non-NEXT_PUBLIC) Vercel variables are readable here.
 
-export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL || "https://welock.in"
-).replace(/\/$/, "");
+// The origin every canonical URL, Open Graph tag and sitemap entry is built
+// from. Getting this wrong is not cosmetic: a canonical pointing at a domain
+// we do not serve hands our pages' ranking to that domain, and an og:image
+// there 404s, so shared links render with no card. Hence: never guess a
+// hard-coded domain — fall back to the one Vercel tells us we are serving.
+function resolveSiteUrl(): string {
+  // 1. Explicit override — set this once a custom domain is attached.
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+  // 2. The project's stable production domain, injected by Vercel. (Not
+  //    VERCEL_URL: that one is per-deployment and changes on every push,
+  //    which would make canonical URLs churn.)
+  const production = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (production) return `https://${production}`;
+  // 3. Local dev.
+  return "http://localhost:3000";
+}
+
+export const SITE_URL = resolveSiteUrl();
 
 export const SITE_NAME = "welock.in";
 
