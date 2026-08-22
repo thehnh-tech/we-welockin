@@ -26,6 +26,7 @@ export type RoomMeta = {
 
 export type RoomPublic = RoomMeta & {
   peerCount: number;
+  capacity: number; // seats in the room; peerCount === capacity means full
   deep: boolean; // any participant currently in Deep Focus
   peerNames: string[]; // up to 4, for the stacked avatars on the feed cards
 };
@@ -57,7 +58,12 @@ export interface StoreBackend {
   // that differ from what everyone else will read, or null when the id is
   // already taken so the caller can regenerate.
   createRoom(meta: RoomMeta): Promise<RoomMeta | null>;
-  announce(input: AnnounceInput): Promise<{ peers: Peer[]; room: RoomMeta }>;
+  // `joined` is false when the room was already full and this peer is NOT a
+  // member — the caller turns that into a visible "room is full" answer
+  // instead of letting someone sit in a room nobody can see them in.
+  announce(
+    input: AnnounceInput
+  ): Promise<{ peers: Peer[]; room: RoomMeta; joined: boolean }>;
   removePeer(roomId: string, peerId: string): Promise<void>;
   listPeers(roomId: string): Promise<Peer[]>;
 }

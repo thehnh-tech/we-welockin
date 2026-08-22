@@ -8,10 +8,16 @@ Video study rooms with a shared focus timer. Next.js + WebRTC mesh via PeerJS.
 - **Home** lets you create a room (name + timer minutes) and shows the
   **public feed** of live rooms started by verified university students.
 - **Private rooms** (default) are joinable by code/link only — no account, no
-  verification, zero friction.
-- **Public rooms** appear on the feed for everyone to join, so creating one
-  requires verifying a **university email** (see below). Joining stays open to
-  all.
+  verification, zero friction. The code *is* the credential: six characters
+  over a 31-letter alphabet (`7Q2XKM`), which is ~887M combinations.
+- **Public rooms** are listed on the feed, so **both creating and joining one
+  require a verified university email** (see below). The check is enforced
+  server-side on every announce, reading the room's *stored* visibility — a
+  client that lies about it in the request body changes nothing.
+- **Every room seats 6.** That is the real ceiling of a WebRTC mesh (each peer
+  streams to every other), so it is enforced and shown, not aspirational: the
+  feed displays `3/6`, a full room is not joinable, and the 7th person gets a
+  clear answer instead of a silently broken call.
 - **Room** opens your camera/mic and connects you peer-to-peer with everyone
   else. The timer runs in the center, synced from the server's `startedAt`.
 - **Video** uses [PeerJS](https://peerjs.com/) with a mesh topology (each peer
@@ -38,6 +44,10 @@ Creating a public room is gated server-side:
    room is labeled with the institution on the feed. The implicit
    create-on-first-announce path force-downgrades to private without it
    (`sanitizeVisibility` is fail-closed).
+4. `POST /api/rooms/[id]/peers` refuses (403 `verification_required`) when the
+   stored room is public and the caller has no valid cookie — so a public
+   room's *link* is not a way around the check. The room page turns that into
+   an inline verification step rather than a dead end.
 
 Codes, verified emails, institution requests, rate limits and the feed archive
 live in **MongoDB** (TTL indexes). Local dev works with zero env vars: codes
@@ -91,16 +101,44 @@ backends, selected automatically at startup (**Redis > MongoDB > memory**):
 Copy `.env.example` to `.env.local` and fill in what you use. On Vercel, add
 the same vars in the project settings.
 
-Mutating routes (`POST /api/rooms`, `POST /api/rooms/[id]/peers`) are body-size
-capped and rate-limited per IP by whichever shared store is configured — Redis
-or MongoDB. With neither (in-memory dev), the limiter is a no-op. Public-room
-creation is additionally capped per verified account, and the verification
-endpoints carry their own per-IP and per-email limits.
+### Room access model
+
+Who may do what, and what enforces it:
+
+| | Private room | Public room |
+|---|---|---|
+| Find it | code only (never listed) | listed on the feed |
+| Create | anyone | verified university email |
+| Join | anyone with the code | verified university email |
+| Seats | 6 | 6 |
+
+The three properties worth knowing:
+
+- **The code is the credential** for a private room, so guessing it must be
+  expensive. It is 6 characters over a 31-letter alphabet (~887M), and *both*
+  the room lookup and the announce are rate-limited per IP — a code this short
+  is only safe while those limiters exist.
+- **A public room's link is not a bypass.** `POST /api/rooms/[id]/peers`
+  re-reads the room's *stored* visibility and answers 403 without a valid
+  cookie, so forging `visibility` in the request body changes nothing.
+- **A peer id is not proof of identity.** Every member sees every other
+  member's id (the mesh needs them to place calls), so the first announce
+  mints a per-peer HMAC token; re-announcing an id already in the room, or
+  removing it, requires that token. Without this, any member could take over
+  another's roster entry or kick them, and anyone with the code could do it
+  from outside.
+
+Mutating routes are body-size capped; room ids are restricted to
+`[a-z0-9-]` before they reach a storage key. Public-room creation is
+additionally capped per verified account, and the verification endpoints
+carry their own per-IP and per-email limits.
 
 ## Limits
 
-- Mesh WebRTC tops out around 5-6 participants. Beyond that, switch to an SFU
-  (LiveKit Cloud has a generous free tier and a drop-in React SDK).
+- Mesh WebRTC tops out around 5-6 participants, which is why `ROOM_CAPACITY`
+  (`lib/store/sanitize.ts`) is 6. Raising it without moving to an SFU
+  (LiveKit Cloud has a generous free tier and a drop-in React SDK) degrades
+  the call for everyone in the room.
 - PeerJS's default cloud broker is rate-limited. For heavy use, self-host
   `peerjs-server` and set `NEXT_PUBLIC_PEER_HOST/PORT/PATH/SECURE` (see
   `.env.example`); they feed `lib/rtc-config.ts`.

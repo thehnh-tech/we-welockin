@@ -9,8 +9,8 @@ import type {
 } from "./types";
 import {
   MAX_LIST_ROOMS,
-  MAX_PEERS_PER_ROOM,
   MAX_ROOMS,
+  ROOM_CAPACITY,
   PEER_TIMEOUT_MS,
   ROOM_TTL_SEC,
   sanitizeDuration,
@@ -158,6 +158,7 @@ function publicView(meta: RoomMeta, peers: Peer[]): RoomPublic {
   return {
     ...meta,
     peerCount: peers.length,
+    capacity: ROOM_CAPACITY,
     deep: anyDeep(peers),
     peerNames: peers.slice(0, 4).map((p) => p.username),
   };
@@ -279,8 +280,10 @@ export const redisBackend: StoreBackend = {
     const existingRaw = await r.hget(namesKey(roomId), peerId);
     const alreadyMember = existingRaw !== null;
     const peerCount = await r.zcard(peersKey(roomId));
-    // Soft per-room cap: silently skip a brand-new peer once full.
-    if (alreadyMember || peerCount < MAX_PEERS_PER_ROOM) {
+    // Members always get back in (a heartbeat must never be evicted by the
+    // cap); a newcomer only when there is a free seat.
+    const joined = alreadyMember || peerCount < ROOM_CAPACITY;
+    if (joined) {
       const prev = parsePeerEntry(existingRaw, now);
       const entry: PeerEntry = {
         username: sanitizeUsername(input.username),
@@ -297,7 +300,7 @@ export const redisBackend: StoreBackend = {
     await r.expire(namesKey(roomId), ROOM_TTL_SEC);
 
     const peers = await readPeers(roomId, now);
-    return { peers, room: meta };
+    return { peers, room: meta, joined };
   },
 
   async removePeer(roomId, peerId) {

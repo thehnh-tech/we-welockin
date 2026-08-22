@@ -10,6 +10,8 @@ import { getStreakDays, getTodaySeconds, getWeekSeconds } from "@/lib/stats";
 import { ROOMS_POLL_MS } from "@/lib/constants";
 import { usePrefs } from "@/lib/prefs";
 import { useNow } from "@/lib/useNow";
+import { useVerified } from "@/lib/useVerified";
+import { ROOM_CAPACITY } from "@/lib/store/sanitize";
 import Avatar from "@/components/Avatar";
 import Padlock from "@/components/Padlock";
 import SettingsMenu from "@/components/SettingsMenu";
@@ -49,6 +51,8 @@ export default function HomeView() {
   const now = useNow(15_000);
   const [pseudo, setPseudoState] = useState<string | null>(null);
   const [pseudoInput, setPseudoInput] = useState("");
+  // University verification (signed httpOnly cookie, read via the API).
+  const [verify, setVerify] = useVerified(!!pseudo);
   // Marketing floor — the counter never looks empty (see /api/rooms).
   const [activeUsers, setActiveUsers] = useState(130);
   const [feedRooms, setFeedRooms] = useState<FeedRoom[]>([]);
@@ -57,12 +61,6 @@ export default function HomeView() {
   const [presetMinutes, setPresetMinutes] = useState<number | "custom">(25);
   const [customMinutes, setCustomMinutes] = useState("45");
   const [visibility, setVisibility] = useState<"private" | "public">("private");
-  // University verification (signed httpOnly cookie, read via /api/verify/status).
-  const [verify, setVerify] = useState<{
-    loaded: boolean;
-    verified: boolean;
-    institution: string;
-  }>({ loaded: false, verified: false, institution: "" });
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   // Set when "Custom" is activated by click/Enter, so the minutes field takes
@@ -114,29 +112,6 @@ export default function HomeView() {
     };
   }, [pseudo]);
 
-  // Am I already university-verified? (cookie survives reloads for a month)
-  useEffect(() => {
-    if (!pseudo) return;
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/verify/status", { cache: "no-store" });
-        const data = await res.json();
-        if (!alive) return;
-        setVerify({
-          loaded: true,
-          verified: data.verified === true,
-          institution:
-            typeof data.institution === "string" ? data.institution : "",
-        });
-      } catch {
-        if (alive) setVerify({ loaded: true, verified: false, institution: "" });
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [pseudo]);
 
   // Resolved timer length in minutes, clamped in JS — no native validation
   // bubbles ("value must be less than or equal to…").
@@ -562,16 +537,17 @@ export default function HomeView() {
 
                 {visibility === "private" ? (
                   <p className="text-xs text-text3">
-                    Your room is private. Share the invite code once
-                    you&apos;re in.
+                    Your room is private and seats {ROOM_CAPACITY}. Share the
+                    invite code once you&apos;re in.
                   </p>
                 ) : verify.verified ? (
                   <p className="text-xs text-text3">
-                    Your room will appear on the public feed for{" "}
+                    Your room seats {ROOM_CAPACITY} and will appear on the
+                    public feed for{" "}
                     <span className="font-semibold text-text2">
                       {verify.institution}
                     </span>
-                    .
+                    . Only verified students can join it.
                   </p>
                 ) : verify.loaded ? (
                   <VerifyUniversity
@@ -634,7 +610,7 @@ export default function HomeView() {
                     setCodeInput(e.target.value);
                     setCodeError(false);
                   }}
-                  placeholder="FOCUS-XXXXX"
+                  placeholder="7Q2XKM"
                   maxLength={20}
                   aria-label="Room code"
                   aria-invalid={codeError}
@@ -673,7 +649,7 @@ export default function HomeView() {
                 </p>
               ) : (
                 <p className="mt-2 text-xs text-text3">
-                  Codes look like FOCUS-ABCDE — ask your crew for theirs.
+                  Six characters, like 7Q2XKM — ask your crew for theirs.
                 </p>
               )}
             </form>

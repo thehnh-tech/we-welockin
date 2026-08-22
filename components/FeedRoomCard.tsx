@@ -12,6 +12,7 @@ export type FeedRoom = {
   startedAt: number;
   institution: string;
   peerCount: number;
+  capacity: number;
   deep: boolean;
   peerNames: string[];
 };
@@ -27,13 +28,22 @@ export default function FeedRoomCard({
 }) {
   const msLeft = room.startedAt + room.durationSec * 1000 - now;
   const minLeft = Math.ceil(msLeft / 60_000);
+  const capacity = room.capacity || 0;
+  const full = capacity > 0 && room.peerCount >= capacity;
 
   return (
     <button
       type="button"
       onClick={() => onJoin(room.id)}
-      className="wl-lift group flex flex-col gap-3 rounded-[16px] border border-hairline bg-surface p-5 text-left shadow-sm"
-      aria-label={`Join ${room.name}`}
+      disabled={full}
+      className={`group flex flex-col gap-3 rounded-[16px] border border-hairline bg-surface p-5 text-left shadow-sm ${
+        full ? "cursor-not-allowed opacity-60" : "wl-lift"
+      }`}
+      aria-label={
+        full
+          ? `${room.name} — full, ${room.peerCount} of ${capacity}`
+          : `Join ${room.name}, ${room.peerCount} of ${capacity} people`
+      }
     >
       <div className="flex w-full items-start justify-between gap-3">
         <div className="min-w-0">
@@ -65,7 +75,11 @@ export default function FeedRoomCard({
             </div>
           )}
         </div>
-        {room.deep ? (
+        {full ? (
+          <span className="shrink-0 rounded-full border border-strong bg-sunken px-2.5 py-1 text-[11px] font-bold text-text2">
+            Full
+          </span>
+        ) : room.deep ? (
           <span className="shrink-0 rounded-full bg-ink px-2.5 py-1 text-[11px] font-bold text-surface">
             Deep Focus
           </span>
@@ -106,27 +120,33 @@ export default function FeedRoomCard({
             ))}
           </div>
           <span className="ml-2 text-xs font-semibold text-text2 tabular-nums">
-            {room.peerCount} locked in
+            {room.peerCount}
+            <span className="text-text3">/{capacity}</span>
+          </span>
+          <span className="ml-1.5 text-xs text-text3">
+            {full ? "seats taken" : "locked in"}
           </span>
         </div>
         <span className="flex items-center gap-1.5 text-xs font-semibold text-text3">
           <span className="tabular-nums">
             {minLeft > 0 ? `${minLeft} min left` : "Wrapping up"}
           </span>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            className="transition-transform duration-200 ease-wl group-hover:translate-x-0.5"
-          >
-            <path d="M5 12h14M13 6l6 6-6 6" />
-          </svg>
+          {!full && (
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className="transition-transform duration-200 ease-wl group-hover:translate-x-0.5"
+            >
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          )}
         </span>
       </div>
     </button>
