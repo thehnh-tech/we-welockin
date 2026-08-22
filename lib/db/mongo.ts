@@ -28,7 +28,16 @@ export async function getDb(): Promise<Db> {
       maxPoolSize: 10,
       maxIdleTimeMS: 60_000,
     });
-    g.__wlisMongo = { clientPromise: client.connect(), indexesEnsured: false };
+    // Drop the cached promise if the connection fails. Caching a REJECTED
+    // promise would be permanent: the guard above only rebuilds when the slot
+    // is empty, so one unlucky cold start — an Atlas failover, a DNS blip —
+    // would make every route on that instance throw for the rest of its life,
+    // long after the database came back.
+    const connecting = client.connect().catch((err) => {
+      if (g.__wlisMongo?.clientPromise === connecting) g.__wlisMongo = undefined;
+      throw err;
+    });
+    g.__wlisMongo = { clientPromise: connecting, indexesEnsured: false };
   }
   const client = await g.__wlisMongo.clientPromise;
   const db = client.db(process.env.MONGODB_DB || "welockin");

@@ -1,4 +1,4 @@
-// MongoDB rooms-store backend — the shared-store option when Upstash Redis is
+﻿// MongoDB rooms-store backend â€” the shared-store option when Upstash Redis is
 // not configured (both come from the same StoreBackend contract, see types.ts).
 //
 // Collections (TTL-swept via lib/db/mongo.ts indexes):
@@ -7,7 +7,7 @@
 //   room_peers  { roomId, peerId, username, joinedAt, lastSeen, status,
 //                 expiresAt }  (unique index on roomId+peerId)
 //
-// Queries always filter on the timestamps themselves — Mongo's TTL monitor
+// Queries always filter on the timestamps themselves â€” Mongo's TTL monitor
 // only sweeps about once a minute.
 
 import type { Collection, Db } from "mongodb";
@@ -176,7 +176,7 @@ export const mongoBackend: StoreBackend = {
     });
   },
 
-  // 3 indexed queries total — cheap enough to skip the snapshot Redis needs.
+  // 3 indexed queries total â€” cheap enough to skip the snapshot Redis needs.
   async getFeed() {
     const [activeUsers, rooms] = await Promise.all([
       mongoBackend.countActivePeers(),
@@ -192,7 +192,7 @@ export const mongoBackend: StoreBackend = {
     const durationSec = sanitizeDuration(inputMeta.durationSec);
 
     // Global cap, matching the other backends' DoS guard. Counts only live
-    // rooms — expired docs the TTL monitor has not swept yet do not count.
+    // rooms â€” expired docs the TTL monitor has not swept yet do not count.
     const live = await roomsCol(db).countDocuments(
       { expiresAt: { $gt: new Date(now) } },
       { limit: MAX_ROOMS }
@@ -213,7 +213,7 @@ export const mongoBackend: StoreBackend = {
       return meta;
     } catch (err) {
       // Duplicate _id: the id is taken (possibly by an expired doc the TTL
-      // monitor has not swept yet — rare enough that the caller regenerating
+      // monitor has not swept yet â€” rare enough that the caller regenerating
       // a fresh id is the simpler answer).
       if ((err as { code?: number })?.code === 11000) return null;
       throw err;
@@ -228,7 +228,7 @@ export const mongoBackend: StoreBackend = {
     // Read WITHOUT refreshing first: a refused caller (unverified on a public
     // room, or an id it cannot prove) must not keep the room alive. The
     // expiresAt predicate matters: Mongo's TTL monitor sweeps only about once
-    // a minute, so a doc can outlive its expiry — without it a heartbeat
+    // a minute, so a doc can outlive its expiry â€” without it a heartbeat
     // landing in that window would revive a dead room's metadata, including
     // its "public" visibility and the departed creator's institution.
     const aliveDoc = await roomsCol(db).findOne({
@@ -244,12 +244,15 @@ export const mongoBackend: StoreBackend = {
 
     const peerId = sanitizePeerId(input.peerId);
     const existing = await peersCol(db).findOne({ roomId, peerId });
-    // "taken" only defends a LIVE seat (see the Redis backend): a dead entry
-    // is usually our own first announce whose response was lost, and must be
-    // reclaimable without a token.
-    const liveMember =
-      !!existing && existing.lastSeen > now - PEER_TIMEOUT_MS;
-    if (liveMember && guard && !guard.peerTokenValid) {
+
+    // The peer doc IS the claim: it carries the room's TTL, so it outlives the
+    // 30s presence window and dies only with the room or a deliberate leave.
+    // Gating on liveness instead would mean 30 seconds of silence â€” a locked
+    // phone, a backgrounded tab â€” surrenders the id to whoever asks next, and
+    // with it the peer token, which never expires. memory.ts and redis.ts each
+    // defend the claim; this backend must not be the soft one, because it is
+    // the one that runs in production.
+    if (existing && guard && !guard.peerTokenValid) {
       return { peers: [], room: meta, joined: false, refused: "taken" as const };
     }
 
@@ -263,9 +266,14 @@ export const mongoBackend: StoreBackend = {
       roomId,
       lastSeen: { $gt: now - PEER_TIMEOUT_MS },
     });
-    // Members always get back in (a heartbeat must never be evicted by the
-    // cap); a newcomer only when there is a free seat.
-    const joined = !!existing || liveCount < ROOM_CAPACITY;
+    // A seat is freed by SILENCE (30s), even though the claim on the id
+    // persists â€” otherwise one person closing their laptop would hold a chair
+    // for the room's whole life. So "already a member" here means LIVE, the
+    // same rule memory.ts applies after cleanupRoom; a returning member whose
+    // presence lapsed needs a free seat, exactly like a newcomer, but nobody
+    // else can have taken their id in the meantime.
+    const liveMember = !!existing && existing.lastSeen > now - PEER_TIMEOUT_MS;
+    const joined = liveMember || liveCount < ROOM_CAPACITY;
     if (joined) {
       await peersCol(db).updateOne(
         { roomId, peerId },
@@ -280,6 +288,27 @@ export const mongoBackend: StoreBackend = {
         },
         { upsert: true }
       );
+
+      // Counting and seating are two round-trips, so two newcomers arriving
+      // together can both read "five seated" and both sit down. Rather than a
+      // transaction for a six-chair room, the loser of the race gives its
+      // chair back: re-count, and if we are a brand-new arrival that pushed
+      // the room over, undo. Redis avoids this in Lua; here it costs one
+      // extra count on joins only, never on heartbeats.
+      if (!liveMember) {
+        const after = await peersCol(db).countDocuments({
+          roomId,
+          lastSeen: { $gt: now - PEER_TIMEOUT_MS },
+        });
+        if (after > ROOM_CAPACITY) {
+          await peersCol(db).deleteOne({ roomId, peerId });
+          return {
+            peers: await readLivePeers(db, roomId, now),
+            room: meta,
+            joined: false,
+          };
+        }
+      }
     }
 
     const peers = await readLivePeers(db, roomId, now);

@@ -250,7 +250,12 @@ export async function allowVerify(
 ): Promise<boolean> {
   try {
     return await store.allow(key, limit, windowSec, now);
-  } catch {
+  } catch (err) {
+    // Fail open — a limiter outage must not take the app down — but never
+    // silently: this fails hardest under exactly the load it exists to shed,
+    // so the log line is the only way anyone learns the limits stopped
+    // applying.
+    console.error("[rate-limit] limiter unavailable, allowing request:", err);
     return true;
   }
 }
