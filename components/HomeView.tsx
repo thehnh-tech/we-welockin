@@ -16,6 +16,7 @@ import Padlock from "@/components/Padlock";
 import SettingsMenu from "@/components/SettingsMenu";
 import VerifyUniversity, { type VerifiedInfo } from "@/components/VerifyUniversity";
 import FeedRoomCard, { type FeedRoom } from "@/components/FeedRoomCard";
+import BlockerBanner from "@/components/BlockerBanner";
 import { handleKeyDown, tabIndexFor } from "@/components/radioPills";
 
 const DAYS = [
@@ -572,67 +573,76 @@ export default function HomeView() {
             </form>
           </div>
 
-          <div className="rounded-[16px] border border-hairline bg-card p-6 shadow-sm">
-            <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
-              Join
-            </div>
-            <div
-              className="mb-3 text-[21px] font-bold text-ink"
-              style={{ letterSpacing: "-0.02em" }}
-            >
-              Got a code?
-            </div>
-            <form onSubmit={joinByCode}>
-              <div className="flex gap-2">
-                <input
-                  value={codeInput}
-                  onChange={(e) => {
-                    setCodeInput(e.target.value);
-                    setCodeError(false);
-                  }}
-                  placeholder="7Q2XKM"
-                  maxLength={20}
-                  aria-label="Room code"
-                  aria-invalid={codeError}
-                  className={`min-w-0 flex-1 rounded-[11px] border bg-surface px-3 py-2.5 text-sm font-semibold uppercase tracking-wider text-ink outline-none transition-colors duration-150 focus:border-accentink ${
-                    codeError ? "border-danger" : "border-strong"
-                  }`}
-                />
-                <button
-                  type="submit"
-                  aria-label="Join with code"
-                  disabled={!codeInput.trim()}
-                  className={`wl-lift flex w-[42px] min-w-[42px] items-center justify-center rounded-[11px] border ${
-                    codeInput.trim()
-                      ? "border-transparent bg-ink text-surface shadow-sm"
-                      : "border-strong bg-surface text-faint"
-                  }`}
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M5 12h14M13 6l6 6-6 6" />
-                  </svg>
-                </button>
+          {/* Right column: join-by-code, then the blocker banner filling the
+              rest of the row next to the taller "New room" card. */}
+          <div className="flex flex-col gap-4">
+            <div className="rounded-[16px] border border-hairline bg-card p-6 shadow-sm">
+              <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
+                Join
               </div>
-              {codeError ? (
-                <p className="mt-2 text-xs font-medium text-danger" role="alert">
-                  That doesn&apos;t look like a room code.
-                </p>
-              ) : (
-                <p className="mt-2 text-xs text-text3">
-                  Six characters, like 7Q2XKM — ask your crew for theirs.
-                </p>
-              )}
-            </form>
+              <div
+                className="mb-3 text-[21px] font-bold text-ink"
+                style={{ letterSpacing: "-0.02em" }}
+              >
+                Got a code?
+              </div>
+              <form onSubmit={joinByCode}>
+                <div className="flex gap-2">
+                  <input
+                    value={codeInput}
+                    onChange={(e) => {
+                      setCodeInput(e.target.value);
+                      setCodeError(false);
+                    }}
+                    placeholder="7Q2XKM"
+                    maxLength={20}
+                    aria-label="Room code"
+                    aria-invalid={codeError}
+                    className={`min-w-0 flex-1 rounded-[11px] border bg-surface px-3 py-2.5 text-sm font-semibold uppercase tracking-wider text-ink outline-none transition-colors duration-150 focus:border-accentink ${
+                      codeError ? "border-danger" : "border-strong"
+                    }`}
+                  />
+                  <button
+                    type="submit"
+                    aria-label="Join with code"
+                    disabled={!codeInput.trim()}
+                    className={`wl-lift flex w-[42px] min-w-[42px] items-center justify-center rounded-[11px] border ${
+                      codeInput.trim()
+                        ? "border-transparent bg-ink text-surface shadow-sm"
+                        : "border-strong bg-surface text-faint"
+                    }`}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>
+                  </button>
+                </div>
+                {codeError ? (
+                  <p className="mt-2 text-xs font-medium text-danger" role="alert">
+                    That doesn&apos;t look like a room code.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-text3">
+                    Six characters, like 7Q2XKM — ask your crew for theirs.
+                  </p>
+                )}
+              </form>
+            </div>
+
+            {/* flex-1 with no explicit min-height: the automatic minimum size
+                keeps it from ever shrinking under its own content, which
+                `overflow-hidden` would otherwise clip. */}
+            <BlockerBanner variant="panel" className="flex-1" />
           </div>
         </div>
 
@@ -692,6 +702,13 @@ export default function HomeView() {
             </div>
           )}
         </section>
+
+        {/* Closing band — the feed can run long, so the blocker is offered
+            again at the end of the page rather than only at the top. */}
+        <BlockerBanner
+          variant="strip"
+          className="animate-wl-rise"
+        />
       </main>
     </div>
   );

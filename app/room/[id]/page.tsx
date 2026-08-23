@@ -19,6 +19,7 @@ import CrewSidebar from "@/components/CrewSidebar";
 import SettingsMenu from "@/components/SettingsMenu";
 import Padlock from "@/components/Padlock";
 import VerifyUniversity from "@/components/VerifyUniversity";
+import BlockerBanner from "@/components/BlockerBanner";
 import { useRoomMeta } from "./hooks/useRoomMeta";
 import { useLocalMedia } from "./hooks/useLocalMedia";
 import { usePeerMesh, type PeerStatus } from "./hooks/usePeerMesh";
@@ -407,7 +408,9 @@ function RoomInner() {
         onLeave={leave}
       />
 
-      <main className="flex h-screen min-w-0 flex-1 flex-col">
+      {/* relative: the blocker dock is anchored to this column's top-right
+          corner, so it stays put while the room content scrolls under it. */}
+      <main className="relative flex h-screen min-w-0 flex-1 flex-col">
         {/* Ink band header — continuous with the sidebar zone. */}
         <header className="flex items-center justify-between gap-3 border-b border-bandline bg-band px-4 py-3 text-bandtext">
           <div className="flex min-w-0 items-center gap-3">
@@ -511,6 +514,10 @@ function RoomInner() {
             <SettingsMenu tone="band" />
           </div>
         </header>
+
+        {/* Deep Focus retracts it: the point of Deep Focus is an empty
+            screen, so the one promo on it gets out of the way first. */}
+        <BlockerBanner variant="dock" retracted={deep} />
 
         <div className="min-h-0 flex-1 overflow-y-auto">
         {banner && (
