@@ -1,4 +1,4 @@
-﻿// One suite, run against EVERY store backend.
+// One suite, run against EVERY store backend.
 //
 // The app was built against the in-memory backend, but production runs a
 // shared one â€” so "it works in memory" proves nothing about what students
@@ -13,6 +13,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MongoMemoryServer } from "mongodb-memory-server";
 import { PEER_TIMEOUT_MS, ROOM_CAPACITY } from "./sanitize";
 import type { RoomMeta, StoreBackend } from "./types";
+import type { UpstashMock } from "./__fixtures__/upstash-mock";
 
 type Backend = { name: string; backend: StoreBackend };
 
@@ -21,6 +22,7 @@ type Backend = { name: string; backend: StoreBackend };
 // to exist by then.
 const backends: Backend[] = [];
 let mongod: MongoMemoryServer | null = null;
+let upstash: UpstashMock | null = null;
 
 const { memoryBackend } = await import("./memory");
 backends.push({ name: "memory", backend: memoryBackend });
@@ -46,12 +48,45 @@ try {
   );
 }
 
+// Redis is the backend the app PREFERS at runtime (see lib/store/index.ts),
+// so leaving it uncovered meant the code path students actually hit — the
+// atomic seat script, every pipeline, the feed snapshot — was the only one
+// nothing tested.
+//
+// Point UPSTASH_REDIS_REST_URL/TOKEN at a real Redis (a
+// hiett/serverless-redis-http container, which speaks this same REST API) and
+// the suite uses it. Otherwise an in-process fixture stands in, so the
+// backend is covered on a laptop with no Docker.
+try {
+  const external = process.env.UPSTASH_REDIS_REST_URL;
+  if (!external) {
+    const { startUpstashMock } = await import("./__fixtures__/upstash-mock");
+    upstash = await startUpstashMock();
+    process.env.UPSTASH_REDIS_REST_URL = upstash.url;
+    process.env.UPSTASH_REDIS_REST_TOKEN = upstash.token;
+  }
+  const { redisBackend } = await import("./redis");
+  await redisBackend.listActiveRooms(); // fail fast if the endpoint is wrong
+  backends.push({ name: `redis${external ? "" : " (mock)"}`, backend: redisBackend });
+} catch (err) {
+  console.warn(
+    "\n[contract] Redis backend NOT covered in this run:",
+    (err as Error)?.message,
+    "\n"
+  );
+}
+
 afterAll(async () => {
   await mongod?.stop();
+  await upstash?.close();
 });
 
-it("covers the production backend, not just the in-memory one", () => {
-  expect(backends.map((b) => b.name)).toContain("mongo");
+it("covers the production backends, not just the in-memory one", () => {
+  const names = backends.map((b) => b.name);
+  expect(names).toContain("mongo");
+  // Redis is preferred over Mongo at runtime, so it is the one that must
+  // never silently drop out of coverage.
+  expect(names.some((n) => n.startsWith("redis"))).toBe(true);
 });
 
 let seq = 0;
