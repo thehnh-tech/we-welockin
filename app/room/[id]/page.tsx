@@ -77,6 +77,8 @@ function RoomInner() {
   const [copied, setCopied] = useState(false);
   const [deep, setDeep] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  // True while focus mode is on only because Deep Focus turned it on.
+  const focusFromDeep = useRef(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobOpen, setMobOpen] = useState(false);
   const prefs = usePrefs();
@@ -159,8 +161,7 @@ function RoomInner() {
   const speaking = useSpeaking(speakingStreams, !deep);
 
   // Focus mode = fullscreen + collapsed sidebar + compact grid.
-  const toggleFocus = () => {
-    const entering = !focusMode;
+  const applyFocus = (entering: boolean) => {
     setFocusMode(entering);
     setCollapsed(entering);
     setMobOpen(false);
@@ -172,11 +173,33 @@ function RoomInner() {
       }
     } catch {}
   };
+  const toggleFocus = () => {
+    focusFromDeep.current = false;
+    applyFocus(!focusMode);
+  };
+
+  // Deep Focus pulls focus mode in with it: engaging it drops you straight
+  // into the fullscreen, sidebar-collapsed view. Leaving it only undoes the
+  // focus mode it turned on itself — one you chose by hand survives.
+  const toggleDeep = () => {
+    const entering = !deep;
+    setDeep(entering);
+    if (entering) {
+      if (!focusMode) {
+        focusFromDeep.current = true;
+        applyFocus(true);
+      }
+    } else if (focusFromDeep.current) {
+      focusFromDeep.current = false;
+      applyFocus(false);
+    }
+  };
   // Leaving fullscreen via Esc exits focus mode too — and restores the
   // sidebar, exactly like the button path does.
   useEffect(() => {
     const onFsChange = () => {
       if (!document.fullscreenElement) {
+        focusFromDeep.current = false;
         setFocusMode((was) => {
           if (was) setCollapsed(false);
           return false;
@@ -562,7 +585,7 @@ function RoomInner() {
             </ControlPill>
 
             <ControlPill
-              onClick={() => setDeep((d) => !d)}
+              onClick={toggleDeep}
               pressed={deep}
               label={deep ? "Exit Deep Focus" : "Enter Deep Focus"}
             >
