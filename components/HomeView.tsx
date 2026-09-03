@@ -348,234 +348,235 @@ export default function HomeView() {
           className="wl-hero -mt-6 mb-9 grid grid-cols-[1.4fr_1fr] gap-4 max-[720px]:grid-cols-1 animate-wl-rise"
           style={{ animationDelay: ".05s" }}
         >
-          <div className="rounded-[16px] border border-hairline bg-surface p-6 shadow-md">
-            <form onSubmit={createRoom}>
-              <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
-                New room
-              </div>
-              <div
-                className="mb-4 text-[21px] font-bold text-ink"
-                style={{ letterSpacing: "-0.02em" }}
-              >
-                Start a focus room
-              </div>
-              <div className="flex flex-col gap-2.5">
-                <input
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Name (e.g. Organic chem finals)"
-                  maxLength={60}
-                  aria-label="Room name"
-                  className="w-full rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accentink"
-                />
-                <input
-                  value={newSubject}
-                  onChange={(e) => setNewSubject(e.target.value)}
-                  placeholder="Subject (optional)"
-                  maxLength={60}
-                  aria-label="Subject"
-                  className="w-full rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accentink"
-                />
-
-                {/* Timer length — selection pills (charter pattern), no native
-                    number-input validation bubbles. The radiogroup wraps the
-                    radios ONLY; the custom-minutes field sits beside it. */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <div
-                    className="flex flex-wrap items-center gap-1.5"
-                    role="radiogroup"
-                    aria-label="Timer length"
-                  >
-                    {DURATION_VALUES.map((m) => {
-                      const selected = presetMinutes === m;
-                      return (
-                        <button
-                          key={String(m)}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          tabIndex={tabIndexFor(m, presetMinutes)}
-                          onKeyDown={(e) =>
-                            handleKeyDown(
-                              e,
-                              DURATION_VALUES,
-                              presetMinutes,
-                              setPresetMinutes
-                            )
-                          }
-                          onClick={() => {
-                            // Activating "Custom" outright (click / Enter)
-                            // drops the caret in the minutes field; arrowing
-                            // ONTO it must not, or focus leaves the group and
-                            // further arrow keys stop working.
-                            if (m === "custom") focusCustomRef.current = true;
-                            setPresetMinutes(m);
-                          }}
-                          className={`rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-colors duration-200 ease-wl ${
-                            selected
-                              ? "border-transparent bg-ink text-surface shadow-xs"
-                              : "border-strong bg-surface text-text2 hover:text-ink"
-                          }`}
-                        >
-                          {m === "custom"
-                            ? "Custom"
-                            : m >= 60
-                              ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}`
-                              : `${m} min`}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {presetMinutes === "custom" && (
-                    <span className="flex items-center gap-1.5 rounded-full border border-strong bg-surface py-1.5 pl-3 pr-3.5 animate-wl-rise">
-                      <input
-                        ref={(el) => {
-                          if (el && focusCustomRef.current) {
-                            focusCustomRef.current = false;
-                            el.focus();
-                          }
-                        }}
-                        value={customMinutes}
-                        onChange={(e) =>
-                          setCustomMinutes(
-                            e.target.value.replace(/[^0-9]/g, "").slice(0, 3)
-                          )
-                        }
-                        inputMode="numeric"
-                        aria-label="Custom length in minutes (1 to 480)"
-                        className="w-10 bg-transparent text-right text-[13px] font-semibold text-ink outline-none tabular-nums"
-                      />
-                      <span className="text-[13px] text-text3">min</span>
-                    </span>
-                  )}
-                </div>
-
-                {/* Visibility — private by default; putting a room on the
-                    public feed requires a verified university email. */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <div
-                    className="flex flex-wrap items-center gap-1.5"
-                    role="radiogroup"
-                    aria-label="Room visibility"
-                  >
-                    {VISIBILITY_VALUES.map((v) => {
-                      const selected = visibility === v;
-                      return (
-                        <button
-                          key={v}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          tabIndex={tabIndexFor(v, visibility)}
-                          onKeyDown={(e) =>
-                            handleKeyDown(
-                              e,
-                              VISIBILITY_VALUES,
-                              visibility,
-                              (next) => {
-                                setVisibility(next);
-                                setPublishError(null);
-                              }
-                            )
-                          }
-                          onClick={() => {
-                            setVisibility(v);
-                            setPublishError(null);
-                          }}
-                          className={`rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-colors duration-200 ease-wl ${
-                            selected
-                              ? "border-transparent bg-ink text-surface shadow-xs"
-                              : "border-strong bg-surface text-text2 hover:text-ink"
-                          }`}
-                        >
-                          {v === "private" ? "Private" : "Public feed"}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {verify.verified && (
-                    <span
-                      className="flex items-center gap-1 rounded-full bg-accenttint px-2.5 py-1.5 text-[11px] font-bold text-accentink"
-                      title={verify.institution}
-                    >
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M20 6L9 17l-5-5" />
-                      </svg>
-                      Verified student
-                    </span>
-                  )}
-                </div>
-
-                {visibility === "private" ? (
-                  <p className="text-xs text-text3">
-                    Your room is private and seats {ROOM_CAPACITY}. Share the
-                    invite code once you&apos;re in.
-                  </p>
-                ) : verify.verified ? (
-                  <p className="text-xs text-text3">
-                    Your room seats {ROOM_CAPACITY} and will appear on the
-                    public feed for{" "}
-                    <span className="font-semibold text-text2">
-                      {verify.institution}
-                    </span>
-                    . Only verified students can join it.
-                  </p>
-                ) : verify.loaded ? (
-                  <VerifyUniversity
-                    onVerified={(v: VerifiedInfo) =>
-                      setVerify({
-                        loaded: true,
-                        verified: true,
-                        institution: v.institution,
-                      })
-                    }
-                  />
-                ) : (
-                  <p className="text-xs text-text3">
-                    Checking your verification…
-                  </p>
-                )}
-
-                {publishError && (
-                  <p className="text-xs font-medium text-danger" role="alert">
-                    {publishError}
-                  </p>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={
-                    publishing || (visibility === "public" && !verify.verified)
-                  }
-                  className="wl-lift mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-accentink px-5 py-[11px] text-sm font-bold shadow-sm disabled:bg-track disabled:text-faint disabled:shadow-none"
-                  style={
-                    publishing || (visibility === "public" && !verify.verified)
-                      ? undefined
-                      : { color: "#fffefb" }
-                  }
-                >
-                  <Padlock size={15} locked />
-                  {publishing
-                    ? "Creating…"
-                    : `Lock in · ${resolvedMinutes} min`}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Right column: join-by-code, then the blocker banner filling the
-              rest of the row next to the taller "New room" card. */}
+          {/* Left column: "New room", then join-by-code under it. Both are
+              ways in, and together they stand as tall as the sidebar unit
+              beside them. */}
           <div className="flex flex-col gap-4">
+            <div className="rounded-[16px] border border-hairline bg-surface p-6 shadow-md">
+              <form onSubmit={createRoom}>
+                <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
+                  New room
+                </div>
+                <div
+                  className="mb-4 text-[21px] font-bold text-ink"
+                  style={{ letterSpacing: "-0.02em" }}
+                >
+                  Start a focus room
+                </div>
+                <div className="flex flex-col gap-2.5">
+                  <input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Name (e.g. Organic chem finals)"
+                    maxLength={60}
+                    aria-label="Room name"
+                    className="w-full rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accentink"
+                  />
+                  <input
+                    value={newSubject}
+                    onChange={(e) => setNewSubject(e.target.value)}
+                    placeholder="Subject (optional)"
+                    maxLength={60}
+                    aria-label="Subject"
+                    className="w-full rounded-[11px] border border-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accentink"
+                  />
+
+                  {/* Timer length — selection pills (charter pattern), no native
+                      number-input validation bubbles. The radiogroup wraps the
+                      radios ONLY; the custom-minutes field sits beside it. */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <div
+                      className="flex flex-wrap items-center gap-1.5"
+                      role="radiogroup"
+                      aria-label="Timer length"
+                    >
+                      {DURATION_VALUES.map((m) => {
+                        const selected = presetMinutes === m;
+                        return (
+                          <button
+                            key={String(m)}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            tabIndex={tabIndexFor(m, presetMinutes)}
+                            onKeyDown={(e) =>
+                              handleKeyDown(
+                                e,
+                                DURATION_VALUES,
+                                presetMinutes,
+                                setPresetMinutes
+                              )
+                            }
+                            onClick={() => {
+                              // Activating "Custom" outright (click / Enter)
+                              // drops the caret in the minutes field; arrowing
+                              // ONTO it must not, or focus leaves the group and
+                              // further arrow keys stop working.
+                              if (m === "custom") focusCustomRef.current = true;
+                              setPresetMinutes(m);
+                            }}
+                            className={`rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-colors duration-200 ease-wl ${
+                              selected
+                                ? "border-transparent bg-ink text-surface shadow-xs"
+                                : "border-strong bg-surface text-text2 hover:text-ink"
+                            }`}
+                          >
+                            {m === "custom"
+                              ? "Custom"
+                              : m >= 60
+                                ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}`
+                                : `${m} min`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {presetMinutes === "custom" && (
+                      <span className="flex items-center gap-1.5 rounded-full border border-strong bg-surface py-1.5 pl-3 pr-3.5 animate-wl-rise">
+                        <input
+                          ref={(el) => {
+                            if (el && focusCustomRef.current) {
+                              focusCustomRef.current = false;
+                              el.focus();
+                            }
+                          }}
+                          value={customMinutes}
+                          onChange={(e) =>
+                            setCustomMinutes(
+                              e.target.value.replace(/[^0-9]/g, "").slice(0, 3)
+                            )
+                          }
+                          inputMode="numeric"
+                          aria-label="Custom length in minutes (1 to 480)"
+                          className="w-10 bg-transparent text-right text-[13px] font-semibold text-ink outline-none tabular-nums"
+                        />
+                        <span className="text-[13px] text-text3">min</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Visibility — private by default; putting a room on the
+                      public feed requires a verified university email. */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <div
+                      className="flex flex-wrap items-center gap-1.5"
+                      role="radiogroup"
+                      aria-label="Room visibility"
+                    >
+                      {VISIBILITY_VALUES.map((v) => {
+                        const selected = visibility === v;
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            tabIndex={tabIndexFor(v, visibility)}
+                            onKeyDown={(e) =>
+                              handleKeyDown(
+                                e,
+                                VISIBILITY_VALUES,
+                                visibility,
+                                (next) => {
+                                  setVisibility(next);
+                                  setPublishError(null);
+                                }
+                              )
+                            }
+                            onClick={() => {
+                              setVisibility(v);
+                              setPublishError(null);
+                            }}
+                            className={`rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-colors duration-200 ease-wl ${
+                              selected
+                                ? "border-transparent bg-ink text-surface shadow-xs"
+                                : "border-strong bg-surface text-text2 hover:text-ink"
+                            }`}
+                          >
+                            {v === "private" ? "Private" : "Public feed"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {verify.verified && (
+                      <span
+                        className="flex items-center gap-1 rounded-full bg-accenttint px-2.5 py-1.5 text-[11px] font-bold text-accentink"
+                        title={verify.institution}
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                        Verified student
+                      </span>
+                    )}
+                  </div>
+
+                  {visibility === "private" ? (
+                    <p className="text-xs text-text3">
+                      Your room is private and seats {ROOM_CAPACITY}. Share the
+                      invite code once you&apos;re in.
+                    </p>
+                  ) : verify.verified ? (
+                    <p className="text-xs text-text3">
+                      Your room seats {ROOM_CAPACITY} and will appear on the
+                      public feed for{" "}
+                      <span className="font-semibold text-text2">
+                        {verify.institution}
+                      </span>
+                      . Only verified students can join it.
+                    </p>
+                  ) : verify.loaded ? (
+                    <VerifyUniversity
+                      onVerified={(v: VerifiedInfo) =>
+                        setVerify({
+                          loaded: true,
+                          verified: true,
+                          institution: v.institution,
+                        })
+                      }
+                    />
+                  ) : (
+                    <p className="text-xs text-text3">
+                      Checking your verification…
+                    </p>
+                  )}
+
+                  {publishError && (
+                    <p className="text-xs font-medium text-danger" role="alert">
+                      {publishError}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={
+                      publishing || (visibility === "public" && !verify.verified)
+                    }
+                    className="wl-lift mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-accentink px-5 py-[11px] text-sm font-bold shadow-sm disabled:bg-track disabled:text-faint disabled:shadow-none"
+                    style={
+                      publishing || (visibility === "public" && !verify.verified)
+                        ? undefined
+                        : { color: "#fffefb" }
+                    }
+                  >
+                    <Padlock size={15} locked />
+                    {publishing
+                      ? "Creating…"
+                      : `Lock in · ${resolvedMinutes} min`}
+                  </button>
+                </div>
+              </form>
+            </div>
+
             <div className="rounded-[16px] border border-hairline bg-card p-6 shadow-sm">
               <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-text3">
                 Join
@@ -638,12 +639,9 @@ export default function HomeView() {
                 )}
               </form>
             </div>
-
-            {/* flex-1 with no explicit min-height: the automatic minimum size
-                keeps it from ever shrinking under its own content, which
-                `overflow-hidden` would otherwise clip. */}
-            <BlockerBanner variant="panel" className="flex-1" />
           </div>
+
+          <BlockerBanner variant="sidebar" />
         </div>
 
         {/* ---- Public feed ---- */}
@@ -703,12 +701,9 @@ export default function HomeView() {
           )}
         </section>
 
-        {/* Closing band — the feed can run long, so the blocker is offered
-            again at the end of the page rather than only at the top. */}
-        <BlockerBanner
-          variant="strip"
-          className="animate-wl-rise"
-        />
+        {/* Bottom bar, pinned to the viewport: the feed can run long, and
+            the blocker stays offered however far down someone has scrolled. */}
+        <BlockerBanner variant="banner" />
       </main>
     </div>
   );

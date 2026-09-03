@@ -408,8 +408,9 @@ function RoomInner() {
         onLeave={leave}
       />
 
-      {/* relative: the blocker dock is anchored to this column's top-right
-          corner, so it stays put while the room content scrolls under it. */}
+      {/* relative: the blocker bubble is anchored to this column's
+          bottom-right corner, so it stays put while the room content scrolls
+          under it. */}
       <main className="relative flex h-screen min-w-0 flex-1 flex-col">
         {/* Ink band header — continuous with the sidebar zone. */}
         <header className="flex items-center justify-between gap-3 border-b border-bandline bg-band px-4 py-3 text-bandtext">
@@ -515,9 +516,10 @@ function RoomInner() {
           </div>
         </header>
 
-        {/* Deep Focus retracts it: the point of Deep Focus is an empty
-            screen, so the one promo on it gets out of the way first. */}
-        <BlockerBanner variant="dock" retracted={deep} />
+        {/* Deep Focus folds it back into its pill: the point of Deep Focus
+            is an empty screen, so the one promo on it gets out of the way
+            first. */}
+        <BlockerBanner variant="bubble" retracted={deep} />
 
         <div className="min-h-0 flex-1 overflow-y-auto">
         {banner && (

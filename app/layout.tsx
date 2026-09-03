@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Figtree } from "next/font/google";
+import { EB_Garamond, Figtree } from "next/font/google";
 import {
   OG_BASE,
   OG_IMAGE,
@@ -16,6 +16,16 @@ const figtree = Figtree({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-figtree",
+  display: "swap",
+});
+
+// The one exception to §03: the welock.in promo sets its student reviews in
+// the brand's serif, and nothing else uses it. Latin only — the other scripts
+// fall back to the system serif.
+const garamond = EB_Garamond({
+  subsets: ["latin"],
+  weight: ["500"],
+  variable: "--font-garamond",
   display: "swap",
 });
 
@@ -81,7 +91,11 @@ export default function RootLayout({
     // suppressHydrationWarning: the head script below sets data-wl-* theme
     // attributes before hydration (anti-flash), which React would otherwise
     // report as a server/client mismatch — same pattern as next-themes.
-    <html lang="en" className={figtree.variable} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${figtree.variable} ${garamond.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {/* Apply theme / accent / reduced-motion before first paint
             (anti-flash: CSS variables key off these attributes). */}
