@@ -2,13 +2,18 @@ import type { BlockerLocale } from "./blocker";
 
 // The seven student reviews the welock.in sidebar unit rotates through —
 // the site's own testimonials, in the site's own translations, with each
-// person's real programme, school and logo. Regenerated from
-// www.welock.in's localized pages; edit there, not here.
+// person's real programme, school and logo. Texts and roles are copied from
+// www.welock.in's localized pages (edit there, then here); `domains` and
+// `langs` are ours, for lib/blocker's orderReviews.
 
 export type BlockerReview = {
   who: string;
   /** School, as a name (the logo carries it visually). */
   where: string;
+  /** The school's email domains — a reader verified there sees it first. */
+  domains: readonly string[];
+  /** Languages the school lives in — readers of those see it early. */
+  langs: readonly BlockerLocale[];
   /** Under /public. */
   photo: string;
   logo: string;
@@ -22,6 +27,8 @@ export const BLOCKER_REVIEWS: readonly BlockerReview[] = [
   {
     who: "Sarah Fourati",
     where: "HEC Paris",
+    domains: ["hec.fr", "hec.edu"],
+    langs: ["fr"],
     photo: "/images/blocker/people/sarah-fourati.webp",
     logo: "/images/blocker/logos/27_HEC.webp",
     text: {
@@ -44,6 +51,8 @@ export const BLOCKER_REVIEWS: readonly BlockerReview[] = [
   {
     who: "Karim Assaf",
     where: "ETH Zürich",
+    domains: ["ethz.ch"],
+    langs: ["de"],
     photo: "/images/blocker/people/karim-assaf.webp",
     logo: "/images/blocker/logos/07_ETH.webp",
     text: {
@@ -66,6 +75,8 @@ export const BLOCKER_REVIEWS: readonly BlockerReview[] = [
   {
     who: "Hedi Fourati",
     where: "École Polytechnique",
+    domains: ["polytechnique.fr", "polytechnique.edu"],
+    langs: ["fr"],
     photo: "/images/blocker/people/hedi-fourati.webp",
     logo: "/images/blocker/logos/polytechnique.webp",
     text: {
@@ -88,6 +99,8 @@ export const BLOCKER_REVIEWS: readonly BlockerReview[] = [
   {
     who: "Selim Haouala",
     where: "EPFL",
+    domains: ["epfl.ch"],
+    langs: ["fr"],
     photo: "/images/blocker/people/selim-haouala.webp",
     logo: "/images/blocker/logos/22_EPFL.webp",
     text: {
@@ -110,6 +123,8 @@ export const BLOCKER_REVIEWS: readonly BlockerReview[] = [
   {
     who: "Selim Msallem",
     where: "HEC Montréal",
+    domains: ["hec.ca"],
+    langs: ["fr"],
     photo: "/images/blocker/people/selim-msallem.webp",
     logo: "/images/blocker/logos/27_HECMONTREAL.png",
     text: {
@@ -132,6 +147,8 @@ export const BLOCKER_REVIEWS: readonly BlockerReview[] = [
   {
     who: "Skander el Gharbi",
     where: "Lycée du Parc",
+    domains: [],
+    langs: ["fr"],
     photo: "/images/blocker/people/skander-gharbi.webp",
     logo: "/images/blocker/logos/30_LyceeParc.png",
     text: {
@@ -154,6 +171,8 @@ export const BLOCKER_REVIEWS: readonly BlockerReview[] = [
   {
     who: "Omar Bouzguenda",
     where: "ESSEC Business School",
+    domains: ["essec.fr", "essec.edu"],
+    langs: ["fr"],
     photo: "/images/blocker/people/omar-bouzguenda.webp",
     logo: "/images/blocker/logos/29_ESSEC.webp",
     text: {

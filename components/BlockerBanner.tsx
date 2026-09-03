@@ -1,10 +1,20 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
 import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  BLOCKER_ORIGIN,
+  BLOCKER_QUIET_AFTER_CLICK_MS,
+  BLOCKER_RETURN_NUDGE_MS,
   BLOCKER_SIDEBAR,
   BLOCKER_STRINGS,
   blockerUrl,
+  orderReviews,
   pickBlockerLocale,
   type BlockerLocale,
   type BlockerPlacement,
@@ -30,6 +40,13 @@ import { BLOCKER_REVIEWS } from "@/lib/blockerReviews";
 // dismissal apply right after, through useSyncExternalStore, never as a
 // mismatch. The links keep their referrer (rel is noopener only): the
 // referral is the point.
+//
+// And a few things it knows. It goes quiet for a fortnight once a CTA has
+// been clicked. The sidebar leads with the reader's own school — their
+// verified email domain — or with schools in their language. In a room the
+// bubble opens by itself, once, when someone comes back after a minute or
+// more off the tab: the moment its own words apply. And the site's
+// connection is warmed the moment a CTA is hovered or focused.
 
 /* -------------------------------------------------------------------------
    Browser state — language and dismissals
@@ -47,44 +64,81 @@ function useBlockerLocale(): BlockerLocale {
   return useSyncExternalStore(subscribeLanguage, readLocale, () => "en");
 }
 
-// The banner closes for good (localStorage); the bubble's "Not now" lasts
-// the session (sessionStorage). Without storage, a dismissal still holds for
-// the life of the page.
+// What has already been said. The banner closes for good and a CTA click
+// quiets the bar and the bubble for a fortnight (localStorage); the bubble's
+// "Not now" and its return nudge last the session (sessionStorage). Without
+// storage, each still holds for the life of the page.
 const BANNER_KEY = "wlis_blocker_banner_v1";
 const BUBBLE_KEY = "wlis_blocker_bubble_v1";
+const QUIET_KEY = "wlis_blocker_quiet_v1";
+const NUDGED_KEY = "wlis_blocker_nudged_v1";
 
-const dismissedNow = new Set<string>();
-const dismissListeners = new Set<() => void>();
-function subscribeDismissals(onChange: () => void) {
-  dismissListeners.add(onChange);
+const remembered = new Map<string, string>();
+const listeners = new Set<() => void>();
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
   return () => {
-    dismissListeners.delete(onChange);
+    listeners.delete(onChange);
   };
 }
 function storageFor(key: string): Storage {
-  return key === BANNER_KEY ? localStorage : sessionStorage;
+  return key === BANNER_KEY || key === QUIET_KEY
+    ? localStorage
+    : sessionStorage;
 }
-function isDismissed(key: string): boolean {
-  if (dismissedNow.has(key)) return true;
+function read(key: string): string | null {
+  const local = remembered.get(key);
+  if (local !== undefined) return local;
   try {
-    return storageFor(key).getItem(key) === "1";
+    return storageFor(key).getItem(key);
   } catch {
-    return false;
+    return null;
   }
 }
-function dismiss(key: string) {
-  dismissedNow.add(key);
+function remember(key: string, value: string) {
+  remembered.set(key, value);
   try {
-    storageFor(key).setItem(key, "1");
+    storageFor(key).setItem(key, value);
   } catch {}
-  dismissListeners.forEach((l) => l());
+  listeners.forEach((l) => l());
 }
-function useDismissed(key: string): boolean {
+function isQuiet(): boolean {
+  const since = Number(read(QUIET_KEY));
+  return since > 0 && Date.now() - since < BLOCKER_QUIET_AFTER_CLICK_MS;
+}
+// Hidden: dismissed, or quiet after a click.
+function useHidden(key: string): boolean {
   return useSyncExternalStore(
-    subscribeDismissals,
-    () => isDismissed(key),
+    subscribe,
+    () => read(key) === "1" || isQuiet(),
     () => false
   );
+}
+
+// Every CTA opens another site. Warm its connection the moment intent shows
+// (hover or focus), once — the landing page then starts a round-trip ahead
+// of the click — and note the click, which quiets the bar and the bubble.
+let warmed = false;
+function warmUp() {
+  if (warmed) return;
+  warmed = true;
+  try {
+    const link = document.createElement("link");
+    link.rel = "preconnect";
+    link.href = BLOCKER_ORIGIN;
+    document.head.appendChild(link);
+  } catch {}
+}
+function noteClick() {
+  remember(QUIET_KEY, String(Date.now()));
+}
+const CTA = { onPointerEnter: warmUp, onFocus: warmUp, onClick: noteClick };
+
+// Days since the epoch: the sidebar's daily start. Read as browser state so
+// the server's copy, which has no reader, simply starts at the top.
+const never = () => () => {};
+function today(): number {
+  return Math.floor(Date.now() / 86_400_000);
 }
 
 /* -------------------------------------------------------------------------
@@ -321,6 +375,7 @@ function CardActions({
         hrefLang={locale}
         target="_blank"
         rel="noopener"
+        {...CTA}
         className="flex h-12 items-center justify-center rounded-[12px] bg-[#1a1714] text-[15px] font-bold tracking-[-0.01em] text-[#fbf8f2] no-underline transition-colors duration-200 hover:bg-[#c8402f]"
       >
         {t.download}
@@ -356,9 +411,17 @@ const ROTATE_MS = 7000;
 function Sidebar({
   locale,
   t,
+  domain = "",
   className = "",
-}: VariantProps & { className?: string }) {
+}: VariantProps & { domain?: string; className?: string }) {
   const s = BLOCKER_SIDEBAR[locale];
+  // The reader's own school first, then schools in their language, the
+  // leading group starting somewhere else each day (orderReviews).
+  const day = useSyncExternalStore(never, today, () => 0);
+  const reviews = useMemo(
+    () => orderReviews(BLOCKER_REVIEWS, locale, domain, day),
+    [locale, domain, day]
+  );
   const [index, setIndex] = useState(0);
   const [rotating, setRotating] = useState(true);
   const stop = () => setRotating(false);
@@ -376,7 +439,7 @@ function Sidebar({
     return () => window.clearInterval(id);
   }, [rotating]);
 
-  const review = BLOCKER_REVIEWS[index];
+  const review = reviews[index % reviews.length];
 
   return (
     <aside
@@ -419,6 +482,7 @@ function Sidebar({
         hrefLang={locale}
         target="_blank"
         rel="noopener"
+        {...CTA}
         className="flex h-[54px] items-center justify-center rounded-full border-[1.5px] border-[#1a1714] bg-[#f0d4ca] text-[16px] font-bold tracking-[-0.012em] text-[#1a1714] no-underline transition-colors duration-200 hover:bg-[#1a1714] hover:text-[#fbf8f2]"
       >
         {s.cta}
@@ -474,7 +538,7 @@ function Sidebar({
         </figure>
 
         <div className="-ml-1.5 mt-2 flex gap-0.5">
-          {BLOCKER_REVIEWS.map((r, n) => (
+          {reviews.map((r, n) => (
             <button
               key={r.who}
               type="button"
@@ -509,8 +573,8 @@ function Banner({
   t,
   className = "",
 }: VariantProps & { className?: string }) {
-  const dismissed = useDismissed(BANNER_KEY);
-  if (dismissed) return null;
+  const hidden = useHidden(BANNER_KEY);
+  if (hidden) return null;
   return (
     <>
       <div aria-hidden="true" className="h-24" />
@@ -524,6 +588,7 @@ function Banner({
           hrefLang={locale}
           target="_blank"
           rel="noopener"
+          {...CTA}
           aria-label="welock.in"
           className="flex shrink-0 items-center gap-[11px] no-underline"
         >
@@ -549,6 +614,7 @@ function Banner({
           hrefLang={locale}
           target="_blank"
           rel="noopener"
+          {...CTA}
           className="group inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[12px] bg-[#c8402f] px-4 text-[14px] font-bold tracking-[-0.01em] text-white no-underline shadow-[0_8px_20px_rgba(26,23,20,.16)] transition-[filter,box-shadow] duration-200 hover:brightness-[.88] hover:shadow-[0_12px_26px_rgba(26,23,20,.22)] max-[560px]:order-2 max-[560px]:w-full sm:h-12 sm:px-[26px] sm:text-[15px]"
         >
           {t.start}
@@ -556,7 +622,7 @@ function Banner({
         </a>
         <button
           type="button"
-          onClick={() => dismiss(BANNER_KEY)}
+          onClick={() => remember(BANNER_KEY, "1")}
           aria-label={t.close}
           className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-[rgba(26,23,20,.05)] text-[#7a7164] transition-colors duration-150 hover:bg-[rgba(26,23,20,.13)] hover:text-[#1a1714] max-[560px]:order-1"
         >
@@ -574,9 +640,34 @@ function Bubble({
   locale,
   t,
   retracted,
-}: VariantProps & { retracted: boolean }) {
-  const gone = useDismissed(BUBBLE_KEY);
+  away = false,
+}: VariantProps & { retracted: boolean; away?: boolean }) {
+  const gone = useHidden(BUBBLE_KEY);
   const [open, setOpen] = useState(false);
+  // Opened by the return nudge — so that click can be told from a tap.
+  const [returned, setReturned] = useState(false);
+
+  // The return nudge. Someone who left the tab for a minute or more and came
+  // back was, most likely, distracted — the one moment the pill's own words
+  // apply. A beat after they return, the card opens on its own: once per
+  // session, never in Deep Focus, and not once it has been sent away.
+  const awaySince = useRef<number | null>(null);
+  useEffect(() => {
+    if (away) {
+      awaySince.current = Date.now();
+      return;
+    }
+    const since = awaySince.current;
+    awaySince.current = null;
+    if (since === null || Date.now() - since < BLOCKER_RETURN_NUDGE_MS) return;
+    if (retracted || gone || read(NUDGED_KEY) === "1") return;
+    const id = window.setTimeout(() => {
+      remember(NUDGED_KEY, "1");
+      setReturned(true);
+      setOpen(true);
+    }, 1200);
+    return () => window.clearTimeout(id);
+  }, [away, retracted, gone]);
 
   // Deep Focus folds the card back into the pill, and leaving it restores
   // only what was there before: a card you closed by hand stays closed.
@@ -619,10 +710,10 @@ function Bubble({
           <CardActions
             t={t}
             locale={locale}
-            placement="bubble"
+            placement={returned ? "bubble-return" : "bubble"}
             onDismiss={() => {
               setOpen(false);
-              dismiss(BUBBLE_KEY);
+              remember(BUBBLE_KEY, "1");
             }}
           />
         </aside>
@@ -651,18 +742,28 @@ export default function BlockerBanner({
   variant = "sidebar",
   className = "",
   retracted = false,
+  away = false,
+  domain = "",
 }: {
   /** sidebar = home right column · banner = bottom bar · bubble = in-room */
   variant?: Variant;
   className?: string;
   /** bubble only: folded back into its pill by Deep Focus. */
   retracted?: boolean;
+  /** bubble only: the tab is hidden — coming back may open the card. */
+  away?: boolean;
+  /** sidebar only: the reader's verified email domain, for their school's review. */
+  domain?: string;
 }) {
   const locale = useBlockerLocale();
   const t = BLOCKER_STRINGS[locale];
   if (variant === "bubble")
-    return <Bubble locale={locale} t={t} retracted={retracted} />;
+    return (
+      <Bubble locale={locale} t={t} retracted={retracted} away={away} />
+    );
   if (variant === "banner")
     return <Banner locale={locale} t={t} className={className} />;
-  return <Sidebar locale={locale} t={t} className={className} />;
+  return (
+    <Sidebar locale={locale} t={t} domain={domain} className={className} />
+  );
 }

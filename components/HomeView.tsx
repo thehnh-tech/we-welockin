@@ -154,7 +154,12 @@ export default function HomeView() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.room) {
         if (res.status === 401) {
-          setVerify({ loaded: true, verified: false, institution: "" });
+          setVerify({
+            loaded: true,
+            verified: false,
+            institution: "",
+            domain: "",
+          });
           setPublishError("Your verification expired — verify again below.");
         } else if (res.status === 429) {
           setPublishError("You've started a lot of rooms — try again later.");
@@ -541,6 +546,7 @@ export default function HomeView() {
                           loaded: true,
                           verified: true,
                           institution: v.institution,
+                          domain: v.domain,
                         })
                       }
                     />
@@ -641,7 +647,9 @@ export default function HomeView() {
             </div>
           </div>
 
-          <BlockerBanner variant="sidebar" />
+          {/* The verified domain lets the unit lead with the reader's own
+              school's review. */}
+          <BlockerBanner variant="sidebar" domain={verify.domain} />
         </div>
 
         {/* ---- Public feed ---- */}

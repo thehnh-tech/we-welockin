@@ -52,7 +52,53 @@ export function pickBlockerLocale(
   return "en";
 }
 
-export type BlockerPlacement = "sidebar" | "banner" | "bubble";
+// "bubble-return" is the bubble opened by its own return nudge, so that
+// click can be told apart from a tap on the pill.
+export type BlockerPlacement =
+  | "sidebar"
+  | "banner"
+  | "bubble"
+  | "bubble-return";
+
+// Once a CTA has been clicked, the bar and the bubble stay quiet this long:
+// someone who has just gone to the download page does not need telling
+// again tomorrow.
+export const BLOCKER_QUIET_AFTER_CLICK_MS = 14 * 24 * 60 * 60 * 1000;
+
+// In a room, this long off the tab counts as a distraction rather than a
+// glance at a notification — long enough for the bubble to open on return.
+export const BLOCKER_RETURN_NUDGE_MS = 60 * 1000;
+
+/**
+ * The order to show reviews in. The reader's own school comes first (their
+ * verified email domain, or a subdomain of it), then schools that live in
+ * the reader's language, then the rest, each group in the given order. The
+ * leading group starts at a different review each day, so a returning
+ * reader is not greeted by the same face every morning — unless that face
+ * is their own school's, which is the point of showing it.
+ */
+export function orderReviews<
+  T extends { domains: readonly string[]; langs: readonly BlockerLocale[] },
+>(reviews: readonly T[], locale: BlockerLocale, domain: string, day: number): T[] {
+  const d = domain.trim().toLowerCase();
+  const rank = (r: T) =>
+    d && r.domains.some((x) => d === x || d.endsWith("." + x))
+      ? 0
+      : r.langs.includes(locale)
+        ? 1
+        : 2;
+  const sorted = reviews
+    .map((r, i) => ({ r, i, k: rank(r) }))
+    .sort((a, b) => a.k - b.k || a.i - b.i);
+  if (sorted.length === 0) return [];
+  const lead = sorted.filter((x) => x.k === sorted[0].k);
+  const rest = sorted.filter((x) => x.k !== sorted[0].k);
+  const n = lead.length;
+  const start = ((Math.trunc(day) % n) + n) % n;
+  return [...lead.slice(start), ...lead.slice(0, start), ...rest].map(
+    (x) => x.r
+  );
+}
 export type BlockerPage = "home" | "download";
 
 /**

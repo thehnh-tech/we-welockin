@@ -99,6 +99,15 @@ describe("language", () => {
 describe("sidebar", () => {
   const figure = () => card()!.querySelector("figure")!;
 
+  // A day whose count since the epoch is a multiple of seven, so the daily
+  // start lands on the first review and the expectations below hold.
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date("2026-01-01T12:00:00Z") });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("shows the headline, three bullets, the CTA and the first review", () => {
     render({ variant: "sidebar" });
     const aside = card()!;
@@ -117,26 +126,20 @@ describe("sidebar", () => {
   });
 
   it("rotates every seven seconds, and a dot stops it on the review picked", () => {
-    vi.useFakeTimers();
-    try {
-      render({ variant: "sidebar" });
-      act(() => {
-        vi.advanceTimersByTime(7000);
-      });
-      expect(figure().textContent).toContain("Karim Assaf");
-      click(card()!.querySelector('button[aria-label="Show review 5"]'));
-      expect(figure().textContent).toContain("Selim Msallem");
-      act(() => {
-        vi.advanceTimersByTime(21000);
-      });
-      expect(figure().textContent).toContain("Selim Msallem");
-    } finally {
-      vi.useRealTimers();
-    }
+    render({ variant: "sidebar" });
+    act(() => {
+      vi.advanceTimersByTime(7000);
+    });
+    expect(figure().textContent).toContain("Karim Assaf");
+    click(card()!.querySelector('button[aria-label="Show review 5"]'));
+    expect(figure().textContent).toContain("Selim Msallem");
+    act(() => {
+      vi.advanceTimersByTime(21000);
+    });
+    expect(figure().textContent).toContain("Selim Msallem");
   });
 
   it("never rotates under the app's reduced-motion setting", () => {
-    vi.useFakeTimers();
     document.documentElement.classList.add("wl-reduce");
     try {
       render({ variant: "sidebar" });
@@ -146,8 +149,25 @@ describe("sidebar", () => {
       expect(figure().textContent).toContain("Sarah Fourati");
     } finally {
       document.documentElement.classList.remove("wl-reduce");
-      vi.useRealTimers();
     }
+  });
+
+  it("leads with the reader's own school, then schools in their language", () => {
+    render({ variant: "sidebar", domain: "student.epfl.ch" });
+    expect(figure().textContent).toContain("Selim Haouala");
+    expect(figure().textContent).toContain("EPFL");
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    setLanguages(["de-AT"]);
+    render({ variant: "sidebar" });
+    expect(figure().textContent).toContain("Karim Assaf");
+  });
+
+  it("starts the day's review somewhere else the next day", () => {
+    vi.setSystemTime(new Date("2026-01-02T12:00:00Z"));
+    render({ variant: "sidebar" });
+    expect(figure().textContent).toContain("Karim Assaf");
   });
 
   it("carries the reviews in the reader's language too", () => {
@@ -217,8 +237,83 @@ describe("banner", () => {
   });
 });
 
-// Dismissals last: they are remembered for the rest of the module's life.
+// Dismissals and nudges last: they are remembered for the rest of the
+// module's life, in the order below.
 describe("dismissals", () => {
+  it("bubble: a short hop off the tab is not a distraction", () => {
+    vi.useFakeTimers();
+    try {
+      render({ variant: "bubble", away: false });
+      render({ variant: "bubble", away: true });
+      act(() => {
+        vi.advanceTimersByTime(20_000);
+      });
+      render({ variant: "bubble", away: false });
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+      expect(card()).toBeNull();
+      expect(pill()).not.toBeNull();
+      expect(sessionStorage.getItem("wlis_blocker_nudged_v1")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("bubble: opens by itself, once, a beat after a minute or more away", () => {
+    vi.useFakeTimers();
+    try {
+      render({ variant: "bubble", away: false });
+      render({ variant: "bubble", away: true });
+      act(() => {
+        vi.advanceTimersByTime(61_000);
+      });
+      render({ variant: "bubble", away: false });
+      expect(card()).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(1_200);
+      });
+      expect(card()).not.toBeNull();
+      expect(card()!.querySelector("a")!.getAttribute("href")).toContain(
+        "utm_content=bubble-return"
+      );
+      expect(sessionStorage.getItem("wlis_blocker_nudged_v1")).toBe("1");
+
+      // Once per session: a second return does nothing.
+      click(card()!.querySelector('button[aria-label="Close"]'));
+      render({ variant: "bubble", away: true });
+      act(() => {
+        vi.advanceTimersByTime(61_000);
+      });
+      render({ variant: "bubble", away: false });
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+      expect(card()).toBeNull();
+      expect(pill()).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("bubble: not in Deep Focus", () => {
+    // The nudge flag is set by now; this checks the fold itself wins.
+    vi.useFakeTimers();
+    try {
+      render({ variant: "bubble", away: true, retracted: true });
+      act(() => {
+        vi.advanceTimersByTime(61_000);
+      });
+      render({ variant: "bubble", away: false, retracted: true });
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+      expect(card()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("bubble: Not now removes it for the session", () => {
     render({ variant: "bubble" });
     click(pill());
@@ -239,5 +334,36 @@ describe("dismissals", () => {
     expect(card()).toBeNull();
     expect(container.querySelector('div[aria-hidden="true"]')).toBeNull();
     expect(localStorage.getItem("wlis_blocker_banner_v1")).toBe("1");
+  });
+
+  it("a CTA click quiets the bar and the bubble, and warms the site first", () => {
+    // jsdom has no navigation; keep the click from trying.
+    container.addEventListener("click", (e) => e.preventDefault());
+    render({ variant: "sidebar" });
+    const cta = card()!.querySelector("a")!;
+    act(() => {
+      (cta as HTMLElement).focus();
+    });
+    expect(
+      document.head.querySelector(
+        'link[rel="preconnect"][href="https://www.welock.in"]'
+      )
+    ).not.toBeNull();
+    click(cta);
+    expect(localStorage.getItem("wlis_blocker_quiet_v1")).toMatch(/^\d+$/);
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    render({ variant: "banner" });
+    expect(card()).toBeNull();
+    act(() => root.unmount());
+    root = createRoot(container);
+    render({ variant: "bubble" });
+    expect(pill()).toBeNull();
+    // The sidebar is page furniture and stays.
+    act(() => root.unmount());
+    root = createRoot(container);
+    render({ variant: "sidebar" });
+    expect(card()).not.toBeNull();
   });
 });

@@ -10,18 +10,22 @@ export type VerifiedState = {
   loaded: boolean;
   verified: boolean;
   institution: string;
+  /** The verified email's domain, as matched ("epfl.ch"); "" when not. */
+  domain: string;
 };
 
 const PENDING: VerifiedState = {
   loaded: false,
   verified: false,
   institution: "",
+  domain: "",
 };
 
 const UNVERIFIED: VerifiedState = {
   loaded: true,
   verified: false,
   institution: "",
+  domain: "",
 };
 
 export function useVerified(enabled = true) {
@@ -40,6 +44,7 @@ export function useVerified(enabled = true) {
           verified: data.verified === true,
           institution:
             typeof data.institution === "string" ? data.institution : "",
+          domain: typeof data.domain === "string" ? data.domain : "",
         });
       } catch {
         // Offline or a server hiccup: treat as unverified rather than

@@ -306,6 +306,7 @@ function RoomInner() {
                 loaded: true,
                 verified: true,
                 institution: v.institution,
+                domain: v.domain,
               })
             }
           />
@@ -518,8 +519,9 @@ function RoomInner() {
 
         {/* Deep Focus folds it back into its pill: the point of Deep Focus
             is an empty screen, so the one promo on it gets out of the way
-            first. */}
-        <BlockerBanner variant="bubble" retracted={deep} />
+            first. `away` lets it open by itself, once, when someone comes
+            back after a while off the tab. */}
+        <BlockerBanner variant="bubble" retracted={deep} away={away} />
 
         <div className="min-h-0 flex-1 overflow-y-auto">
         {banner && (

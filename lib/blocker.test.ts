@@ -5,8 +5,10 @@ import {
   BLOCKER_SIDEBAR,
   BLOCKER_STRINGS,
   blockerUrl,
+  orderReviews,
   pickBlockerLocale,
 } from "./blocker";
+import { BLOCKER_REVIEWS } from "./blockerReviews";
 
 describe("pickBlockerLocale", () => {
   it("matches the exact tag the site publishes, whatever the case", () => {
@@ -100,6 +102,50 @@ describe("BLOCKER_STRINGS", () => {
       for (const name of ["Mac", "PC", "iPhone", "iPad"]) {
         expect(devices, locale).toContain(name);
       }
+    }
+  });
+});
+
+describe("orderReviews", () => {
+  const who = (xs: readonly { who: string }[]) => xs.map((r) => r.who);
+
+  it("leads with the reader's own school, by verified domain or a subdomain", () => {
+    expect(who(orderReviews(BLOCKER_REVIEWS, "en", "student.epfl.ch", 0))[0]).toBe(
+      "Selim Haouala"
+    );
+    expect(who(orderReviews(BLOCKER_REVIEWS, "en", "ETHZ.CH", 5))[0]).toBe(
+      "Karim Assaf"
+    );
+    // A look-alike domain is not a match.
+    expect(who(orderReviews(BLOCKER_REVIEWS, "en", "notepfl.ch", 0))[0]).toBe(
+      "Sarah Fourati"
+    );
+  });
+
+  it("then schools that live in the reader's language", () => {
+    expect(who(orderReviews(BLOCKER_REVIEWS, "de", "", 0))[0]).toBe("Karim Assaf");
+    // Every school but ETH is francophone, so for French readers ETH is last.
+    const fr = who(orderReviews(BLOCKER_REVIEWS, "fr", "", 0));
+    expect(fr[fr.length - 1]).toBe("Karim Assaf");
+  });
+
+  it("starts the leading group somewhere else each day, keeping the set", () => {
+    const a = who(orderReviews(BLOCKER_REVIEWS, "en", "", 0));
+    const b = who(orderReviews(BLOCKER_REVIEWS, "en", "", 1));
+    expect(a[0]).toBe("Sarah Fourati");
+    expect(b[0]).toBe("Karim Assaf");
+    expect([...a].sort()).toEqual([...b].sort());
+    expect(who(orderReviews(BLOCKER_REVIEWS, "en", "", 7))).toEqual(a);
+    expect(who(orderReviews(BLOCKER_REVIEWS, "en", "", -1))[0]).toBe(
+      "Omar Bouzguenda"
+    );
+  });
+
+  it("never lets the day move the reader's own school off the top", () => {
+    for (const day of [0, 3, 6]) {
+      expect(who(orderReviews(BLOCKER_REVIEWS, "fr", "hec.fr", day))[0]).toBe(
+        "Sarah Fourati"
+      );
     }
   });
 });
