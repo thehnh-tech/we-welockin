@@ -22,7 +22,7 @@ import { BLOCKER_REVIEWS } from "@/lib/blockerReviews";
 // bottom. In a room, the sidebar unit — headline, bullets, CTA and the
 // site's seven student reviews rotating underneath — in a rail down the
 // right of the room, which retracts into the bubble: a pill in the corner
-// that expands the rail again.
+// that is itself a link to the site.
 //
 // It is the brand's world, not the app's: cream paper, ink and welock.in red
 // whatever theme the app is in — the same line the ink band draws, in the
@@ -47,7 +47,8 @@ import { BLOCKER_REVIEWS } from "@/lib/blockerReviews";
 // In a room nothing sends the promo away outright: every way of putting it
 // down folds it into the pill instead, which is small, sits in the corner,
 // and is the one thing worth having on screen at the moment someone
-// realises they are distracted.
+// realises they are distracted — so the pill asks its question and, when
+// the answer is yes, goes straight to the site.
 
 /* -------------------------------------------------------------------------
    Browser state — language, width, and what has already been said
@@ -512,11 +513,11 @@ function Unit({
 type Variant = "banner" | "dock";
 
 // In a room: the unit in a rail down the right of the room column, and the
-// bubble it retracts into — a pill in the bottom-right corner that brings
-// the rail back. The rail slides out on margin-right, the way the crew
-// sidebar slides out on the other side, so the tiles reflow rather than
-// being covered; Deep Focus retracts it, which is the whole point of Deep
-// Focus, and leaving Deep Focus returns it to whatever it was before.
+// bubble it retracts into — a pill in the bottom-right corner that links
+// straight to the site. The rail slides out on margin-right, the way the
+// crew sidebar slides out on the other side, so the tiles reflow rather
+// than being covered; Deep Focus retracts it, which is the whole point of
+// Deep Focus, and leaving Deep Focus returns it to whatever it was before.
 function Dock({
   locale,
   t,
@@ -540,22 +541,9 @@ function Dock({
 
   // Deep Focus retracts the rail, but the pill stays: on an emptied screen
   // it is the one thing that answers "I am distracted right now", which is
-  // the moment someone reaches for a blocker. So it still opens the rail
-  // from here, and that tap outlives Deep Focus — it was made while Deep
-  // Focus was on. Tracked against the last change of `retracted`, and
-  // adjusted during render rather than in an effect, so there is never a
-  // frame with the rail still out.
-  const [openedInDeep, setOpenedInDeep] = useState(false);
-  const [wasRetracted, setWasRetracted] = useState(retracted);
-  if (retracted !== wasRetracted) {
-    setWasRetracted(retracted);
-    if (!retracted) setOpenedInDeep(false);
-  }
-
+  // the moment someone reaches for a blocker.
   const collapsed =
-    (retracted && !openedInDeep) ||
-    pinned === "shut" ||
-    (pinned === "auto" && narrow);
+    retracted || pinned === "shut" || (pinned === "auto" && narrow);
 
   // The return nudge. Someone who left the tab for a minute or more and came
   // back was, most likely, distracted — the one moment the pill's own words
@@ -599,32 +587,33 @@ function Dock({
             placement={returned ? "dock-return" : "dock"}
             onRetract={() => {
               setReturned(false);
-              setOpenedInDeep(false);
               setPinned("shut");
             }}
           />
         </div>
       </div>
 
+      {/* The pill is the ad in one line, so it is the link: someone who reads
+          "too distracted?" in the corner and taps it has answered the
+          question, and the rail behind it would only ask again. */}
       {collapsed && (
-        <button
-          type="button"
-          onClick={() => {
-            setReturned(false);
-            setOpenedInDeep(true);
-            setPinned("open");
-          }}
-          aria-expanded={false}
-          className="absolute bottom-4 right-4 z-30 flex h-14 items-center gap-3 rounded-full border border-[rgba(26,23,20,.08)] bg-[#fbf8f2] pl-[9px] pr-[22px] text-left shadow-[0_16px_34px_rgba(26,23,20,.2)] transition-[box-shadow,background-color] duration-200 hover:bg-white hover:shadow-[0_20px_42px_rgba(26,23,20,.28)] animate-wl-rise"
+        <a
+          href={blockerUrl(locale, "download", "bubble")}
+          hrefLang={locale}
+          target="_blank"
+          rel="noopener"
+          {...CTA}
+          lang={locale}
+          className="absolute bottom-4 right-4 z-30 flex h-14 items-center gap-3 rounded-full border border-[rgba(26,23,20,.08)] bg-[#fbf8f2] pl-[9px] pr-[22px] text-left no-underline shadow-[0_16px_34px_rgba(26,23,20,.2)] transition-[box-shadow,background-color] duration-200 hover:bg-white hover:shadow-[0_20px_42px_rgba(26,23,20,.28)] animate-wl-rise"
         >
           <Mark size={38} />
-          <span lang={locale} className="flex flex-col items-start leading-[1.22]">
+          <span className="flex flex-col items-start leading-[1.22]">
             <span className="text-[15px] font-bold tracking-[-0.015em] text-[#1a1714]">
               {t.pillTitle}
             </span>
             <span className="text-[12.5px] text-[#7a7164]">{t.pillSub}</span>
           </span>
-        </button>
+        </a>
       )}
     </>
   );

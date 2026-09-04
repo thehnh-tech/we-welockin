@@ -52,9 +52,15 @@ export function pickBlockerLocale(
   return "en";
 }
 
-// "dock-return" is the in-room rail brought out by its own return nudge, so
-// that click can be told apart from one on a rail the reader opened.
-export type BlockerPlacement = "banner" | "dock" | "dock-return";
+// "bubble" is the pill the in-room rail folds into, which is a link to the
+// site in its own right; "dock-return" is that rail brought out by its own
+// return nudge, so that click can be told apart from one on a rail the
+// reader opened.
+export type BlockerPlacement =
+  | "banner"
+  | "bubble"
+  | "dock"
+  | "dock-return";
 
 // Once a CTA has been clicked, the bar and the bubble stay quiet this long:
 // someone who has just gone to the download page does not need telling

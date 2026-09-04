@@ -49,9 +49,10 @@ function click(el: Element | null) {
 const unit = () => container.querySelector("aside");
 const rail = () => container.querySelector(".wl-promorail");
 const collapsed = () => !!rail()?.classList.contains("wl-collapsed");
+// The pill is a link to the site, not a control.
 const pill = () =>
-  [...container.querySelectorAll("button")].find((b) =>
-    b.textContent?.includes("Too distracted?")
+  [...container.querySelectorAll("a")].find((a) =>
+    a.textContent?.includes("Too distracted?")
   ) ?? null;
 const retractButton = () => unit()!.querySelector('button[aria-label="Close"]');
 const cta = () => unit()!.querySelector("a")!;
@@ -198,13 +199,16 @@ describe("the rail and its pill", () => {
     expect(rail()!.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("comes back from the pill, tagged as the rail again", () => {
+  it("folds into a pill that links to the site", () => {
     render({ variant: "dock" });
     click(retractButton());
-    click(pill());
-    expect(collapsed()).toBe(false);
-    expect(pill()).toBeNull();
-    expect(cta().getAttribute("href")).toContain("utm_content=dock");
+    const link = pill()!;
+    expect(link.getAttribute("href")).toBe(
+      "https://www.welock.in/download?utm_source=welockin-study&utm_medium=referral&utm_campaign=blocker&utm_content=bubble"
+    );
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener");
+    expect(link.getAttribute("hreflang")).toBe("en");
   });
 
   it("starts as a pill where the room is too narrow for it", () => {
@@ -219,9 +223,6 @@ describe("the rail and its pill", () => {
       render({ variant: "dock" });
       expect(collapsed()).toBe(true);
       expect(pill()).not.toBeNull();
-      // A tap pins it open, width notwithstanding.
-      click(pill());
-      expect(collapsed()).toBe(false);
     } finally {
       window.matchMedia = real;
     }
@@ -232,22 +233,16 @@ describe("the rail and its pill", () => {
     render({ variant: "dock", retracted: true });
     expect(collapsed()).toBe(true);
     // The pill stays: an emptied screen is exactly when someone reaches for
-    // a blocker, and it still opens the rail from there.
+    // a blocker, and the pill is the way out to one.
     expect(pill()).not.toBeNull();
-    click(pill());
-    expect(collapsed()).toBe(false);
   });
 
-  it("a rail opened during Deep Focus stays out after it", () => {
+  it("leaves Deep Focus as it found it", () => {
+    render({ variant: "dock", retracted: false });
     render({ variant: "dock", retracted: true });
-    click(pill());
     render({ variant: "dock", retracted: false });
     expect(collapsed()).toBe(false);
-
-    // And the next Deep Focus retracts it again.
-    render({ variant: "dock", retracted: true });
-    expect(collapsed()).toBe(true);
-    expect(pill()).not.toBeNull();
+    expect(pill()).toBeNull();
   });
 
   it("Not now folds it into the pill, the same as the cross", () => {
