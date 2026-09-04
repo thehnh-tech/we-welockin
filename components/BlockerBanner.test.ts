@@ -353,9 +353,9 @@ describe("dismissals", () => {
     expect(localStorage.getItem("wlis_blocker_banner_v1")).toBe("1");
   });
 
-  it("a CTA click quiets both placements, and warms the site first", async () => {
-    // A fresh copy of the module: the dismissals above are held in its own
-    // memory as well as in storage, and this needs a promo left to click.
+  it("warms the site on intent, and stays put once followed", async () => {
+    // A fresh copy of the module: the banner above was closed in its own
+    // memory as well as in storage.
     vi.resetModules();
     const Fresh = (await import("./BlockerBanner")).default;
     const render = (props: Parameters<typeof BlockerBanner>[0]) =>
@@ -373,17 +373,16 @@ describe("dismissals", () => {
         'link[rel="preconnect"][href="https://www.welock.in"]'
       )
     ).not.toBeNull();
+
+    // The link opens a tab of its own; nothing here is taken down for it.
     click(cta());
-    expect(localStorage.getItem("wlis_blocker_quiet_v1")).toMatch(/^\d+$/);
+    expect(unit()).not.toBeNull();
+    expect(localStorage.length).toBe(0);
+    expect(sessionStorage.length).toBe(0);
 
     act(() => root.unmount());
     root = createRoot(container);
     render({ variant: "banner" });
-    expect(unit()).toBeNull();
-    act(() => root.unmount());
-    root = createRoot(container);
-    render({ variant: "dock" });
-    expect(unit()).toBeNull();
-    expect(pill()).toBeNull();
+    expect(unit()).not.toBeNull();
   });
 });

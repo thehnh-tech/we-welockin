@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   BLOCKER_ORIGIN,
-  BLOCKER_QUIET_AFTER_CLICK_MS,
   BLOCKER_RETURN_NUDGE_MS,
   BLOCKER_SIDEBAR,
   BLOCKER_STRINGS,
@@ -37,18 +36,18 @@ import { BLOCKER_REVIEWS } from "@/lib/blockerReviews";
 // as a mismatch. The links keep their referrer (rel is noopener only): the
 // referral is the point.
 //
-// And a few things it knows. It goes quiet for a fortnight once a CTA has
-// been clicked. The unit leads with the reader's own school — their verified
-// email domain — or with schools in their language. A retracted rail opens
-// by itself, once, when someone comes back after a minute or more off the
-// tab: the moment the pill's own words apply. And the site's connection is
-// warmed the moment a CTA is hovered or focused.
+// And a few things it knows. The unit leads with the reader's own school —
+// their verified email domain — or with schools in their language. A
+// retracted rail opens by itself, once, when someone comes back after a
+// minute or more off the tab: the moment the pill's own words apply. And
+// the site's connection is warmed the moment a CTA is hovered or focused.
 //
-// In a room nothing sends the promo away outright: every way of putting it
-// down folds it into the pill instead, which is small, sits in the corner,
-// and is the one thing worth having on screen at the moment someone
-// realises they are distracted — so the pill asks its question and, when
-// the answer is yes, goes straight to the site.
+// In a room nothing sends the promo away: every way of putting it down
+// folds it into the pill instead, which is small, sits in the corner, and
+// is the one thing worth having on screen at the moment someone realises
+// they are distracted — so the pill asks its question and, when the answer
+// is yes, goes straight to the site. Following a link does not take the
+// promo down either: it opens a tab elsewhere and leaves this one alone.
 
 /* -------------------------------------------------------------------------
    Browser state — language, width, and what has already been said
@@ -86,12 +85,10 @@ function useNarrow(): boolean {
   return narrow;
 }
 
-// The banner closes for good and a CTA click quiets the promo for a
-// fortnight (localStorage); the rail's return nudge lasts the session
-// (sessionStorage). Without storage, each still holds for the life of the
-// page.
+// The banner closes for good on its cross (localStorage); the rail's return
+// nudge lasts the session (sessionStorage). Without storage, each still
+// holds for the life of the page.
 const BANNER_KEY = "wlis_blocker_banner_v1";
-const QUIET_KEY = "wlis_blocker_quiet_v1";
 const NUDGED_KEY = "wlis_blocker_nudged_v1";
 
 const remembered = new Map<string, string>();
@@ -103,9 +100,7 @@ function subscribe(onChange: () => void) {
   };
 }
 function storageFor(key: string): Storage {
-  return key === BANNER_KEY || key === QUIET_KEY
-    ? localStorage
-    : sessionStorage;
+  return key === BANNER_KEY ? localStorage : sessionStorage;
 }
 function read(key: string): string | null {
   const local = remembered.get(key);
@@ -123,22 +118,17 @@ function remember(key: string, value: string) {
   } catch {}
   listeners.forEach((l) => l());
 }
-function isQuiet(): boolean {
-  const since = Number(read(QUIET_KEY));
-  return since > 0 && Date.now() - since < BLOCKER_QUIET_AFTER_CLICK_MS;
+function useDismissed(key: string): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => read(key) === "1",
+    () => false
+  );
 }
-function useStored(snapshot: () => boolean): boolean {
-  return useSyncExternalStore(subscribe, snapshot, () => false);
-}
-// The rail goes away only once a CTA has been clicked; the banner also has
-// its cross.
-const useQuiet = () => useStored(isQuiet);
-const useBannerGone = () =>
-  useStored(() => read(BANNER_KEY) === "1" || isQuiet());
 
-// Every CTA opens another site. Warm its connection the moment intent shows
-// (hover or focus), once — the landing page then starts a round-trip ahead
-// of the click — and note the click, which quiets the promo.
+// Every CTA opens another site, in a tab of its own. Warm its connection
+// the moment intent shows (hover or focus), once: the landing page then
+// starts a round-trip ahead of the click.
 let warmed = false;
 function warmUp() {
   if (warmed) return;
@@ -150,10 +140,7 @@ function warmUp() {
     document.head.appendChild(link);
   } catch {}
 }
-function noteClick() {
-  remember(QUIET_KEY, String(Date.now()));
-}
-const CTA = { onPointerEnter: warmUp, onFocus: warmUp, onClick: noteClick };
+const CTA = { onPointerEnter: warmUp, onFocus: warmUp };
 
 // Days since the epoch: the unit's daily start. Read as browser state so the
 // server's copy, which has no reader, simply starts at the top.
@@ -531,7 +518,6 @@ function Dock({
   retracted: boolean;
   away: boolean;
 }) {
-  const gone = useQuiet();
   const narrow = useNarrow();
   // "auto" follows the width; a click pins it either way for the session.
   const [pinned, setPinned] = useState<"auto" | "open" | "shut">("auto");
@@ -559,7 +545,7 @@ function Dock({
     const since = awaySince.current;
     awaySince.current = null;
     if (since === null || Date.now() - since < BLOCKER_RETURN_NUDGE_MS) return;
-    if (!collapsed || retracted || gone || read(NUDGED_KEY) === "1") return;
+    if (!collapsed || retracted || read(NUDGED_KEY) === "1") return;
     const id = window.setTimeout(() => {
       remember(NUDGED_KEY, "1");
       setReturned(true);
@@ -568,8 +554,6 @@ function Dock({
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [away]);
-
-  if (gone) return null;
 
   return (
     <>
@@ -633,7 +617,7 @@ function Banner({
   t: BlockerStrings;
   className?: string;
 }) {
-  const gone = useBannerGone();
+  const gone = useDismissed(BANNER_KEY);
   if (gone) return null;
   return (
     <>

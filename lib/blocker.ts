@@ -62,11 +62,6 @@ export type BlockerPlacement =
   | "dock"
   | "dock-return";
 
-// Once a CTA has been clicked, the bar and the bubble stay quiet this long:
-// someone who has just gone to the download page does not need telling
-// again tomorrow.
-export const BLOCKER_QUIET_AFTER_CLICK_MS = 14 * 24 * 60 * 60 * 1000;
-
 // In a room, this long off the tab counts as a distraction rather than a
 // glance at a notification — long enough for the bubble to open on return.
 export const BLOCKER_RETURN_NUDGE_MS = 60 * 1000;
