@@ -20,8 +20,8 @@ import { BLOCKER_REVIEWS } from "@/lib/blockerReviews";
 // Two placements, three shapes. On the home page, the cream bar along the
 // bottom. In a room, the sidebar unit — headline, bullets, CTA and the
 // site's seven student reviews rotating underneath — in a rail down the
-// right of the room, which retracts into the bubble: a pill in the corner
-// that is itself a link to the site.
+// right of the room. Both fold into the same third shape, the bubble: a
+// pill in the corner that is itself a link to the site.
 //
 // It is the brand's world, not the app's: cream paper, ink and welock.in red
 // whatever theme the app is in — the same line the ink band draws, in the
@@ -42,12 +42,12 @@ import { BLOCKER_REVIEWS } from "@/lib/blockerReviews";
 // minute or more off the tab: the moment the pill's own words apply. And
 // the site's connection is warmed the moment a CTA is hovered or focused.
 //
-// In a room nothing sends the promo away: every way of putting it down
-// folds it into the pill instead, which is small, sits in the corner, and
-// is the one thing worth having on screen at the moment someone realises
-// they are distracted — so the pill asks its question and, when the answer
-// is yes, goes straight to the site. Following a link does not take the
-// promo down either: it opens a tab elsewhere and leaves this one alone.
+// Nothing sends the promo away: every way of putting it down folds it into
+// the pill instead, which is small, sits in the corner, and is the one
+// thing worth having on screen at the moment someone realises they are
+// distracted — so the pill asks its question and, when the answer is yes,
+// goes straight to the site. Following a link does not take the promo down
+// either: it opens a tab elsewhere and leaves this one alone.
 
 /* -------------------------------------------------------------------------
    Browser state — language, width, and what has already been said
@@ -85,9 +85,10 @@ function useNarrow(): boolean {
   return narrow;
 }
 
-// The banner closes for good on its cross (localStorage); the rail's return
-// nudge lasts the session (sessionStorage). Without storage, each still
-// holds for the life of the page.
+// The bar stays folded once folded (localStorage: it covers the foot of
+// the page, so unfolding it on every visit would be pushy); the rail's
+// return nudge lasts the session (sessionStorage). Without storage, each
+// still holds for the life of the page.
 const BANNER_KEY = "wlis_blocker_banner_v1";
 const NUDGED_KEY = "wlis_blocker_nudged_v1";
 
@@ -118,7 +119,7 @@ function remember(key: string, value: string) {
   } catch {}
   listeners.forEach((l) => l());
 }
-function useDismissed(key: string): boolean {
+function useFolded(key: string): boolean {
   return useSyncExternalStore(
     subscribe,
     () => read(key) === "1",
@@ -494,6 +495,45 @@ function Unit({
 }
 
 /* -------------------------------------------------------------------------
+   The bubble — what both placements fold into
+------------------------------------------------------------------------- */
+
+// The ad in one line, so it is the link: someone who reads "too
+// distracted?" in the corner and taps it has answered the question, and
+// unfolding the whole unit would only ask it again at greater length.
+// Positioning is the caller's: the rail's pill is absolute inside the room
+// column, the bar's is fixed to the viewport.
+function Pill({
+  locale,
+  t,
+  className,
+}: {
+  locale: BlockerLocale;
+  t: BlockerStrings;
+  className: string;
+}) {
+  return (
+    <a
+      href={blockerUrl(locale, "download", "bubble")}
+      hrefLang={locale}
+      target="_blank"
+      rel="noopener"
+      {...CTA}
+      lang={locale}
+      className={`${className} flex h-14 items-center gap-3 rounded-full border border-[rgba(26,23,20,.08)] bg-[#fbf8f2] pl-[9px] pr-[22px] text-left no-underline shadow-[0_16px_34px_rgba(26,23,20,.2)] transition-[box-shadow,background-color] duration-200 hover:bg-white hover:shadow-[0_20px_42px_rgba(26,23,20,.28)] animate-wl-rise`}
+    >
+      <Mark size={38} />
+      <span className="flex flex-col items-start leading-[1.22]">
+        <span className="text-[15px] font-bold tracking-[-0.015em] text-[#1a1714]">
+          {t.pillTitle}
+        </span>
+        <span className="text-[12.5px] text-[#7a7164]">{t.pillSub}</span>
+      </span>
+    </a>
+  );
+}
+
+/* -------------------------------------------------------------------------
    Placements
 ------------------------------------------------------------------------- */
 
@@ -577,37 +617,26 @@ function Dock({
         </div>
       </div>
 
-      {/* The pill is the ad in one line, so it is the link: someone who reads
-          "too distracted?" in the corner and taps it has answered the
-          question, and the rail behind it would only ask again. */}
+      {/* Anchored to the room column, so it sits in the corner of the room
+          rather than the corner of the window. */}
       {collapsed && (
-        <a
-          href={blockerUrl(locale, "download", "bubble")}
-          hrefLang={locale}
-          target="_blank"
-          rel="noopener"
-          {...CTA}
-          lang={locale}
-          className="absolute bottom-4 right-4 z-30 flex h-14 items-center gap-3 rounded-full border border-[rgba(26,23,20,.08)] bg-[#fbf8f2] pl-[9px] pr-[22px] text-left no-underline shadow-[0_16px_34px_rgba(26,23,20,.2)] transition-[box-shadow,background-color] duration-200 hover:bg-white hover:shadow-[0_20px_42px_rgba(26,23,20,.28)] animate-wl-rise"
-        >
-          <Mark size={38} />
-          <span className="flex flex-col items-start leading-[1.22]">
-            <span className="text-[15px] font-bold tracking-[-0.015em] text-[#1a1714]">
-              {t.pillTitle}
-            </span>
-            <span className="text-[12.5px] text-[#7a7164]">{t.pillSub}</span>
-          </span>
-        </a>
+        <Pill
+          locale={locale}
+          t={t}
+          className="absolute bottom-4 right-4 z-30"
+        />
       )}
     </>
   );
 }
 
 // Home: the cream bar pinned to the bottom of the viewport. Slides up on
-// load, closes for good on the cross. The in-flow spacer keeps the page's
-// last content scrollable clear of it (the bar is fixed, so it takes no
-// space of its own). On a phone the CTA drops to its own row under the
-// copy: side by side, the headline would wrap four deep beside it.
+// load; the cross folds it into the pill, the same bubble the room's rail
+// folds into, which stays in the corner. The in-flow spacer keeps the
+// page's last content scrollable clear of the bar (it is fixed, so it takes
+// no space of its own); folded, the pill is small enough not to need one.
+// On a phone the CTA drops to its own row under the copy: side by side, the
+// headline would wrap four deep beside it.
 function Banner({
   locale,
   t,
@@ -617,8 +646,9 @@ function Banner({
   t: BlockerStrings;
   className?: string;
 }) {
-  const gone = useDismissed(BANNER_KEY);
-  if (gone) return null;
+  const folded = useFolded(BANNER_KEY);
+  if (folded)
+    return <Pill locale={locale} t={t} className="fixed bottom-4 right-4 z-30" />;
   return (
     <>
       <div aria-hidden="true" className="h-24" />

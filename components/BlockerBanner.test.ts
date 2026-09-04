@@ -345,11 +345,14 @@ describe("dismissals", () => {
     }
   });
 
-  it("banner: the cross closes it for good", () => {
+  it("banner: the cross folds it into the same pill, for good", () => {
     render({ variant: "banner" });
     click(unit()!.querySelector('button[aria-label="Close"]'));
     expect(unit()).toBeNull();
     expect(container.querySelector('div[aria-hidden="true"]')).toBeNull();
+    const link = pill()!;
+    expect(link.getAttribute("href")).toContain("utm_content=bubble");
+    expect(link.className).toContain("fixed");
     expect(localStorage.getItem("wlis_blocker_banner_v1")).toBe("1");
   });
 
