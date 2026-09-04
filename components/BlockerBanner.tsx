@@ -43,6 +43,11 @@ import { BLOCKER_REVIEWS } from "@/lib/blockerReviews";
 // by itself, once, when someone comes back after a minute or more off the
 // tab: the moment the pill's own words apply. And the site's connection is
 // warmed the moment a CTA is hovered or focused.
+//
+// In a room nothing sends the promo away outright: every way of putting it
+// down folds it into the pill instead, which is small, sits in the corner,
+// and is the one thing worth having on screen at the moment someone
+// realises they are distracted.
 
 /* -------------------------------------------------------------------------
    Browser state — language, width, and what has already been said
@@ -81,11 +86,10 @@ function useNarrow(): boolean {
 }
 
 // The banner closes for good and a CTA click quiets the promo for a
-// fortnight (localStorage); the rail's "Not now" and its return nudge last
-// the session (sessionStorage). Without storage, each still holds for the
-// life of the page.
+// fortnight (localStorage); the rail's return nudge lasts the session
+// (sessionStorage). Without storage, each still holds for the life of the
+// page.
 const BANNER_KEY = "wlis_blocker_banner_v1";
-const DOCK_KEY = "wlis_blocker_dock_v1";
 const QUIET_KEY = "wlis_blocker_quiet_v1";
 const NUDGED_KEY = "wlis_blocker_nudged_v1";
 
@@ -122,14 +126,14 @@ function isQuiet(): boolean {
   const since = Number(read(QUIET_KEY));
   return since > 0 && Date.now() - since < BLOCKER_QUIET_AFTER_CLICK_MS;
 }
-// Gone: dismissed, or quiet after a click.
-function useGone(key: string): boolean {
-  return useSyncExternalStore(
-    subscribe,
-    () => read(key) === "1" || isQuiet(),
-    () => false
-  );
+function useStored(snapshot: () => boolean): boolean {
+  return useSyncExternalStore(subscribe, snapshot, () => false);
 }
+// The rail goes away only once a CTA has been clicked; the banner also has
+// its cross.
+const useQuiet = () => useStored(isQuiet);
+const useBannerGone = () =>
+  useStored(() => read(BANNER_KEY) === "1" || isQuiet());
 
 // Every CTA opens another site. Warm its connection the moment intent shows
 // (hover or focus), once — the landing page then starts a round-trip ahead
@@ -324,16 +328,13 @@ function Unit({
   domain,
   placement,
   onRetract,
-  onDismiss,
 }: {
   locale: BlockerLocale;
   t: BlockerStrings;
   domain: string;
   placement: BlockerPlacement;
-  /** Fold the unit back into the pill. */
+  /** Fold the unit back into the pill — the cross and "Not now" both do. */
   onRetract: () => void;
-  /** Send it away for the session. */
-  onDismiss: () => void;
 }) {
   const s = BLOCKER_SIDEBAR[locale];
   // The reader's own school first, then schools in their language, the
@@ -419,9 +420,11 @@ function Unit({
         {s.cta}
       </a>
 
+      {/* The same fold as the cross above it: one of the two is always the
+          nearer hand, and neither takes the promo away for good. */}
       <button
         type="button"
-        onClick={onDismiss}
+        onClick={onRetract}
         className="mt-2.5 block w-full py-1.5 text-[13px] font-medium text-[#8a8175] transition-colors duration-150 hover:text-[#1a1714]"
       >
         {t.notNow}
@@ -527,15 +530,32 @@ function Dock({
   retracted: boolean;
   away: boolean;
 }) {
-  const gone = useGone(DOCK_KEY);
+  const gone = useQuiet();
   const narrow = useNarrow();
   // "auto" follows the width; a click pins it either way for the session.
   const [pinned, setPinned] = useState<"auto" | "open" | "shut">("auto");
   // Opened by the return nudge, so that click can be told from a tap on the
   // pill. Cleared as soon as the reader works the rail by hand.
   const [returned, setReturned] = useState(false);
+
+  // Deep Focus retracts the rail, but the pill stays: on an emptied screen
+  // it is the one thing that answers "I am distracted right now", which is
+  // the moment someone reaches for a blocker. So it still opens the rail
+  // from here, and that tap outlives Deep Focus — it was made while Deep
+  // Focus was on. Tracked against the last change of `retracted`, and
+  // adjusted during render rather than in an effect, so there is never a
+  // frame with the rail still out.
+  const [openedInDeep, setOpenedInDeep] = useState(false);
+  const [wasRetracted, setWasRetracted] = useState(retracted);
+  if (retracted !== wasRetracted) {
+    setWasRetracted(retracted);
+    if (!retracted) setOpenedInDeep(false);
+  }
+
   const collapsed =
-    retracted || pinned === "shut" || (pinned === "auto" && narrow);
+    (retracted && !openedInDeep) ||
+    pinned === "shut" ||
+    (pinned === "auto" && narrow);
 
   // The return nudge. Someone who left the tab for a minute or more and came
   // back was, most likely, distracted — the one moment the pill's own words
@@ -579,18 +599,19 @@ function Dock({
             placement={returned ? "dock-return" : "dock"}
             onRetract={() => {
               setReturned(false);
+              setOpenedInDeep(false);
               setPinned("shut");
             }}
-            onDismiss={() => remember(DOCK_KEY, "1")}
           />
         </div>
       </div>
 
-      {collapsed && !retracted && (
+      {collapsed && (
         <button
           type="button"
           onClick={() => {
             setReturned(false);
+            setOpenedInDeep(true);
             setPinned("open");
           }}
           aria-expanded={false}
@@ -623,7 +644,7 @@ function Banner({
   t: BlockerStrings;
   className?: string;
 }) {
-  const gone = useGone(BANNER_KEY);
+  const gone = useBannerGone();
   if (gone) return null;
   return (
     <>

@@ -227,12 +227,40 @@ describe("the rail and its pill", () => {
     }
   });
 
-  it("is retracted by Deep Focus, pill and all", () => {
+  it("is retracted by Deep Focus, down to its pill", () => {
     render({ variant: "dock", retracted: false });
     render({ variant: "dock", retracted: true });
     expect(collapsed()).toBe(true);
-    // Deep Focus is an empty screen: not even the pill stays.
-    expect(pill()).toBeNull();
+    // The pill stays: an emptied screen is exactly when someone reaches for
+    // a blocker, and it still opens the rail from there.
+    expect(pill()).not.toBeNull();
+    click(pill());
+    expect(collapsed()).toBe(false);
+  });
+
+  it("a rail opened during Deep Focus stays out after it", () => {
+    render({ variant: "dock", retracted: true });
+    click(pill());
+    render({ variant: "dock", retracted: false });
+    expect(collapsed()).toBe(false);
+
+    // And the next Deep Focus retracts it again.
+    render({ variant: "dock", retracted: true });
+    expect(collapsed()).toBe(true);
+    expect(pill()).not.toBeNull();
+  });
+
+  it("Not now folds it into the pill, the same as the cross", () => {
+    render({ variant: "dock" });
+    click(
+      [...unit()!.querySelectorAll("button")].find((b) =>
+        b.textContent?.includes("Not now")
+      ) ?? null
+    );
+    expect(collapsed()).toBe(true);
+    expect(pill()).not.toBeNull();
+    // Nothing in a room takes the promo away outright.
+    expect(sessionStorage.length).toBe(0);
   });
 
   it("leaving Deep Focus restores only what was there before", () => {
@@ -320,19 +348,6 @@ describe("dismissals", () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it("dock: Not now takes it away for the session, pill included", () => {
-    render({ variant: "dock" });
-    click(
-      [...unit()!.querySelectorAll("button")].find((b) =>
-        b.textContent?.includes("Not now")
-      ) ?? null
-    );
-    expect(unit()).toBeNull();
-    expect(pill()).toBeNull();
-    expect(sessionStorage.getItem("wlis_blocker_dock_v1")).toBe("1");
-    expect(localStorage.getItem("wlis_blocker_banner_v1")).toBeNull();
   });
 
   it("banner: the cross closes it for good", () => {

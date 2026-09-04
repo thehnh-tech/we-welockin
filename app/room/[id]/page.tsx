@@ -519,10 +519,10 @@ function RoomInner() {
 
         {/* The room and the promo rail, side by side: the rail is part of
             the row, so opening it reflows the tiles instead of covering
-            them. Deep Focus retracts it — the point of Deep Focus is an
-            empty screen, so the one promo on it goes first — and `away`
-            brings it back out, once, when someone returns after a while off
-            the tab. */}
+            them. Deep Focus retracts it to its pill — an empty screen is
+            the point of Deep Focus, and a pill in the corner is the whole
+            of the promo it leaves — and `away` brings the rail back out,
+            once, when someone returns after a while off the tab. */}
         <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1 overflow-y-auto">
         {banner && (
