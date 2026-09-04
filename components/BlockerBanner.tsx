@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   BLOCKER_ORIGIN,
   BLOCKER_QUIET_AFTER_CLICK_MS,
@@ -22,11 +16,13 @@ import {
 } from "@/lib/blocker";
 import { BLOCKER_REVIEWS } from "@/lib/blockerReviews";
 
-// The welock.in blocker promo, in the three shapes of the v2 ad kit: a
-// cream bar pinned to the bottom of the page (banner), a pill in the bottom
-// corner that opens into a card (bubble), and the sidebar unit in the home
-// page's right column — headline, bullets, CTA and the site's seven student
-// reviews rotating underneath.
+// The welock.in blocker promo, in the shapes of the v2 ad kit.
+//
+// Two placements, three shapes. On the home page, the cream bar along the
+// bottom. In a room, the sidebar unit — headline, bullets, CTA and the
+// site's seven student reviews rotating underneath — in a rail down the
+// right of the room, which retracts into the bubble: a pill in the corner
+// that expands the rail again.
 //
 // It is the brand's world, not the app's: cream paper, ink and welock.in red
 // whatever theme the app is in — the same line the ink band draws, in the
@@ -36,20 +32,20 @@ import { BLOCKER_REVIEWS } from "@/lib/blockerReviews";
 // with its language; links that land on welock.in's canonical host, on the
 // page in that language, and say so (hreflang); an inline SVG mark (no
 // request, no layout shift); and everything server-rendered in English so
-// the markup is in the HTML before hydration — the language and any
-// dismissal apply right after, through useSyncExternalStore, never as a
-// mismatch. The links keep their referrer (rel is noopener only): the
+// the markup is in the HTML before hydration — the language, the collapse
+// and any dismissal apply right after, through useSyncExternalStore, never
+// as a mismatch. The links keep their referrer (rel is noopener only): the
 // referral is the point.
 //
 // And a few things it knows. It goes quiet for a fortnight once a CTA has
-// been clicked. The sidebar leads with the reader's own school — their
-// verified email domain — or with schools in their language. In a room the
-// bubble opens by itself, once, when someone comes back after a minute or
-// more off the tab: the moment its own words apply. And the site's
-// connection is warmed the moment a CTA is hovered or focused.
+// been clicked. The unit leads with the reader's own school — their verified
+// email domain — or with schools in their language. A retracted rail opens
+// by itself, once, when someone comes back after a minute or more off the
+// tab: the moment the pill's own words apply. And the site's connection is
+// warmed the moment a CTA is hovered or focused.
 
 /* -------------------------------------------------------------------------
-   Browser state — language and dismissals
+   Browser state — language, width, and what has already been said
 ------------------------------------------------------------------------- */
 
 function subscribeLanguage(onChange: () => void) {
@@ -64,12 +60,32 @@ function useBlockerLocale(): BlockerLocale {
   return useSyncExternalStore(subscribeLanguage, readLocale, () => "en");
 }
 
-// What has already been said. The banner closes for good and a CTA click
-// quiets the bar and the bubble for a fortnight (localStorage); the bubble's
-// "Not now" and its return nudge last the session (sessionStorage). Without
-// storage, each still holds for the life of the page.
+// Below this, the rail would leave the video tiles too little room, so it
+// starts retracted — still openable by hand from the pill.
+const NARROW = "(max-width: 1199px)";
+
+// Mirrored into state after mount rather than read through
+// useSyncExternalStore: the server has no viewport, so its snapshot has to
+// be a guess, and the client answer must win as soon as there is one.
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia?.(NARROW);
+    if (!mq) return;
+    const apply = () => setNarrow(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return narrow;
+}
+
+// The banner closes for good and a CTA click quiets the promo for a
+// fortnight (localStorage); the rail's "Not now" and its return nudge last
+// the session (sessionStorage). Without storage, each still holds for the
+// life of the page.
 const BANNER_KEY = "wlis_blocker_banner_v1";
-const BUBBLE_KEY = "wlis_blocker_bubble_v1";
+const DOCK_KEY = "wlis_blocker_dock_v1";
 const QUIET_KEY = "wlis_blocker_quiet_v1";
 const NUDGED_KEY = "wlis_blocker_nudged_v1";
 
@@ -106,8 +122,8 @@ function isQuiet(): boolean {
   const since = Number(read(QUIET_KEY));
   return since > 0 && Date.now() - since < BLOCKER_QUIET_AFTER_CLICK_MS;
 }
-// Hidden: dismissed, or quiet after a click.
-function useHidden(key: string): boolean {
+// Gone: dismissed, or quiet after a click.
+function useGone(key: string): boolean {
   return useSyncExternalStore(
     subscribe,
     () => read(key) === "1" || isQuiet(),
@@ -117,7 +133,7 @@ function useHidden(key: string): boolean {
 
 // Every CTA opens another site. Warm its connection the moment intent shows
 // (hover or focus), once — the landing page then starts a round-trip ahead
-// of the click — and note the click, which quiets the bar and the bubble.
+// of the click — and note the click, which quiets the promo.
 let warmed = false;
 function warmUp() {
   if (warmed) return;
@@ -134,8 +150,8 @@ function noteClick() {
 }
 const CTA = { onPointerEnter: warmUp, onFocus: warmUp, onClick: noteClick };
 
-// Days since the epoch: the sidebar's daily start. Read as browser state so
-// the server's copy, which has no reader, simply starts at the top.
+// Days since the epoch: the unit's daily start. Read as browser state so the
+// server's copy, which has no reader, simply starts at the top.
 const never = () => () => {};
 function today(): number {
   return Math.floor(Date.now() / 86_400_000);
@@ -296,124 +312,29 @@ function CrossIcon({ size }: { size: number }) {
   );
 }
 
-function CheckIcon() {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#c8402f"
-      strokeWidth="3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="mt-[3px]"
-    >
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-}
-
 /* -------------------------------------------------------------------------
-   The card — the panel on its own, and the bubble once opened
+   The unit — headline, bullets, CTA, and the reviews underneath
 ------------------------------------------------------------------------- */
 
-const CARD =
-  "rounded-[20px] border border-[rgba(26,23,20,.1)] bg-[#f5f0e8] p-[22px] text-[#1a1714]";
-
-function CardTop({ t, onClose }: { t: BlockerStrings; onClose?: () => void }) {
-  return (
-    <div>
-      <div className="mb-4 flex items-center gap-2.5">
-        <Mark size={28} />
-        <Wordmark size={16} />
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t.close}
-            className="ml-auto flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[rgba(26,23,20,.06)] text-[#7a7164] transition-colors duration-150 hover:bg-[rgba(26,23,20,.14)] hover:text-[#1a1714]"
-          >
-            <CrossIcon size={13} />
-          </button>
-        )}
-      </div>
-      <p className="mb-3 text-[22px] font-semibold leading-[1.16] tracking-[-0.022em]">
-        {t.headline}
-      </p>
-      <ul className="flex flex-col gap-[9px]">
-        {t.bullets.map((b) => (
-          <li
-            key={b}
-            className="grid grid-cols-[auto_1fr] items-start gap-2.5 text-[13.5px] leading-[1.45] text-[#433d36]"
-          >
-            <CheckIcon />
-            <span>{b}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function CardActions({
-  t,
-  locale,
-  placement,
-  onDismiss,
-}: {
-  t: BlockerStrings;
-  locale: BlockerLocale;
-  placement: BlockerPlacement;
-  onDismiss?: () => void;
-}) {
-  return (
-    <div className="mt-[18px]">
-      <a
-        href={blockerUrl(locale, "download", placement)}
-        hrefLang={locale}
-        target="_blank"
-        rel="noopener"
-        {...CTA}
-        className="flex h-12 items-center justify-center rounded-[12px] bg-[#1a1714] text-[15px] font-bold tracking-[-0.01em] text-[#fbf8f2] no-underline transition-colors duration-200 hover:bg-[#c8402f]"
-      >
-        {t.download}
-      </a>
-      {onDismiss && (
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="mt-2.5 block w-full py-1.5 text-[13px] font-medium text-[#8a8175] transition-colors duration-150 hover:text-[#1a1714]"
-        >
-          {t.notNow}
-        </button>
-      )}
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------
-   Variants
-------------------------------------------------------------------------- */
-
-type Variant = "sidebar" | "banner" | "bubble";
-
-type VariantProps = { locale: BlockerLocale; t: BlockerStrings };
-
-// Home, right column: the sidebar unit. Headline, three bullets, the CTA,
-// then the seven student reviews from welock.in, one at a time, rotating
-// every seven seconds. Hovering, focusing or picking a dot stops the
-// rotation for good, and it never starts under a reduced-motion preference
-// (system or app): text changing under a reader is motion too.
 const ROTATE_MS = 7000;
 
-function Sidebar({
+function Unit({
   locale,
   t,
-  domain = "",
-  className = "",
-}: VariantProps & { domain?: string; className?: string }) {
+  domain,
+  placement,
+  onRetract,
+  onDismiss,
+}: {
+  locale: BlockerLocale;
+  t: BlockerStrings;
+  domain: string;
+  placement: BlockerPlacement;
+  /** Fold the unit back into the pill. */
+  onRetract: () => void;
+  /** Send it away for the session. */
+  onDismiss: () => void;
+}) {
   const s = BLOCKER_SIDEBAR[locale];
   // The reader's own school first, then schools in their language, the
   // leading group starting somewhere else each day (orderReviews).
@@ -423,6 +344,8 @@ function Sidebar({
     [locale, domain, day]
   );
   const [index, setIndex] = useState(0);
+  // The reviews rotate until the reader shows any interest in them —
+  // hovering, focusing, or picking one by hand.
   const [rotating, setRotating] = useState(true);
   const stop = () => setRotating(false);
 
@@ -447,14 +370,22 @@ function Sidebar({
       aria-label={t.label}
       onMouseEnter={stop}
       onFocus={stop}
-      className={`rounded-[18px] border border-[rgba(26,23,20,.09)] bg-[#fbf8f2] px-[22px] pb-[22px] pt-6 text-[#1a1714] shadow-[0_10px_28px_rgba(26,23,20,.07)] ${className}`}
+      className="rounded-[18px] border border-[rgba(26,23,20,.09)] bg-[#fbf8f2] px-[22px] pb-[22px] pt-4 text-[#1a1714] shadow-[0_10px_28px_rgba(26,23,20,.07)]"
     >
-      <div className="mb-5 flex items-center gap-2.5">
+      <div className="mb-4 flex items-center gap-2.5">
         <Mark size={26} />
         <Wordmark size={15} />
+        <button
+          type="button"
+          onClick={onRetract}
+          aria-label={t.close}
+          className="ml-auto flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[rgba(26,23,20,.06)] text-[#7a7164] transition-colors duration-150 hover:bg-[rgba(26,23,20,.14)] hover:text-[#1a1714]"
+        >
+          <CrossIcon size={13} />
+        </button>
       </div>
 
-      <p className="mb-5 text-[29px] font-bold leading-[1.14] tracking-[-0.028em]">
+      <p className="mb-4 text-[29px] font-bold leading-[1.14] tracking-[-0.028em]">
         {s.headline[0]}
         <span className="rounded-[3px] bg-[#f0d4ca] px-[5px] py-px">
           {s.headline[1]}
@@ -462,7 +393,7 @@ function Sidebar({
         {s.headline[2]}
       </p>
 
-      <ul className="mb-[22px] flex flex-col gap-3">
+      <ul className="mb-4 flex flex-col gap-3">
         {s.bullets.map((b) => (
           <li
             key={b}
@@ -478,7 +409,7 @@ function Sidebar({
       </ul>
 
       <a
-        href={blockerUrl(locale, "download", "sidebar")}
+        href={blockerUrl(locale, "download", placement)}
         hrefLang={locale}
         target="_blank"
         rel="noopener"
@@ -488,13 +419,21 @@ function Sidebar({
         {s.cta}
       </a>
 
-      <div className="mt-[22px] border-t border-[rgba(26,23,20,.11)] pt-5">
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="mt-2.5 block w-full py-1.5 text-[13px] font-medium text-[#8a8175] transition-colors duration-150 hover:text-[#1a1714]"
+      >
+        {t.notNow}
+      </button>
+
+      <div className="mt-3 border-t border-[rgba(26,23,20,.11)] pt-4">
         {/* Keyed on the person so a change re-runs the fade-in. min-height,
             not height: a long translation grows the unit rather than
             spilling out of it. */}
         <figure
           key={review.who}
-          className="flex min-h-[262px] flex-col justify-between animate-wl-rise"
+          className="flex min-h-[236px] flex-col justify-between animate-wl-rise"
         >
           <blockquote>
             <p
@@ -563,6 +502,113 @@ function Sidebar({
   );
 }
 
+/* -------------------------------------------------------------------------
+   Placements
+------------------------------------------------------------------------- */
+
+type Variant = "banner" | "dock";
+
+// In a room: the unit in a rail down the right of the room column, and the
+// bubble it retracts into — a pill in the bottom-right corner that brings
+// the rail back. The rail slides out on margin-right, the way the crew
+// sidebar slides out on the other side, so the tiles reflow rather than
+// being covered; Deep Focus retracts it, which is the whole point of Deep
+// Focus, and leaving Deep Focus returns it to whatever it was before.
+function Dock({
+  locale,
+  t,
+  domain,
+  retracted,
+  away,
+}: {
+  locale: BlockerLocale;
+  t: BlockerStrings;
+  domain: string;
+  retracted: boolean;
+  away: boolean;
+}) {
+  const gone = useGone(DOCK_KEY);
+  const narrow = useNarrow();
+  // "auto" follows the width; a click pins it either way for the session.
+  const [pinned, setPinned] = useState<"auto" | "open" | "shut">("auto");
+  // Opened by the return nudge, so that click can be told from a tap on the
+  // pill. Cleared as soon as the reader works the rail by hand.
+  const [returned, setReturned] = useState(false);
+  const collapsed =
+    retracted || pinned === "shut" || (pinned === "auto" && narrow);
+
+  // The return nudge. Someone who left the tab for a minute or more and came
+  // back was, most likely, distracted — the one moment the pill's own words
+  // apply. A beat after they return the rail opens on its own: once per
+  // session, only from retracted, never in Deep Focus, never once it has
+  // been sent away.
+  const awaySince = useRef<number | null>(null);
+  useEffect(() => {
+    if (away) {
+      awaySince.current = Date.now();
+      return;
+    }
+    const since = awaySince.current;
+    awaySince.current = null;
+    if (since === null || Date.now() - since < BLOCKER_RETURN_NUDGE_MS) return;
+    if (!collapsed || retracted || gone || read(NUDGED_KEY) === "1") return;
+    const id = window.setTimeout(() => {
+      remember(NUDGED_KEY, "1");
+      setReturned(true);
+      setPinned("open");
+    }, 1200);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [away]);
+
+  if (gone) return null;
+
+  return (
+    <>
+      <div
+        className={`wl-promorail border-l border-hairline ${
+          collapsed ? "wl-collapsed" : ""
+        }`}
+        aria-hidden={collapsed || undefined}
+      >
+        <div className="wl-promoinner">
+          <Unit
+            locale={locale}
+            t={t}
+            domain={domain}
+            placement={returned ? "dock-return" : "dock"}
+            onRetract={() => {
+              setReturned(false);
+              setPinned("shut");
+            }}
+            onDismiss={() => remember(DOCK_KEY, "1")}
+          />
+        </div>
+      </div>
+
+      {collapsed && !retracted && (
+        <button
+          type="button"
+          onClick={() => {
+            setReturned(false);
+            setPinned("open");
+          }}
+          aria-expanded={false}
+          className="absolute bottom-4 right-4 z-30 flex h-14 items-center gap-3 rounded-full border border-[rgba(26,23,20,.08)] bg-[#fbf8f2] pl-[9px] pr-[22px] text-left shadow-[0_16px_34px_rgba(26,23,20,.2)] transition-[box-shadow,background-color] duration-200 hover:bg-white hover:shadow-[0_20px_42px_rgba(26,23,20,.28)] animate-wl-rise"
+        >
+          <Mark size={38} />
+          <span lang={locale} className="flex flex-col items-start leading-[1.22]">
+            <span className="text-[15px] font-bold tracking-[-0.015em] text-[#1a1714]">
+              {t.pillTitle}
+            </span>
+            <span className="text-[12.5px] text-[#7a7164]">{t.pillSub}</span>
+          </span>
+        </button>
+      )}
+    </>
+  );
+}
+
 // Home: the cream bar pinned to the bottom of the viewport. Slides up on
 // load, closes for good on the cross. The in-flow spacer keeps the page's
 // last content scrollable clear of it (the bar is fixed, so it takes no
@@ -572,9 +618,13 @@ function Banner({
   locale,
   t,
   className = "",
-}: VariantProps & { className?: string }) {
-  const hidden = useHidden(BANNER_KEY);
-  if (hidden) return null;
+}: {
+  locale: BlockerLocale;
+  t: BlockerStrings;
+  className?: string;
+}) {
+  const gone = useGone(BANNER_KEY);
+  if (gone) return null;
   return (
     <>
       <div aria-hidden="true" className="h-24" />
@@ -633,137 +683,36 @@ function Banner({
   );
 }
 
-// In a room: a pill in the bottom-right corner of the room column that opens
-// into the card. Escape or the cross fold it back; "Not now" removes it for
-// the session.
-function Bubble({
-  locale,
-  t,
-  retracted,
-  away = false,
-}: VariantProps & { retracted: boolean; away?: boolean }) {
-  const gone = useHidden(BUBBLE_KEY);
-  const [open, setOpen] = useState(false);
-  // Opened by the return nudge — so that click can be told from a tap.
-  const [returned, setReturned] = useState(false);
-
-  // The return nudge. Someone who left the tab for a minute or more and came
-  // back was, most likely, distracted — the one moment the pill's own words
-  // apply. A beat after they return, the card opens on its own: once per
-  // session, never in Deep Focus, and not once it has been sent away.
-  const awaySince = useRef<number | null>(null);
-  useEffect(() => {
-    if (away) {
-      awaySince.current = Date.now();
-      return;
-    }
-    const since = awaySince.current;
-    awaySince.current = null;
-    if (since === null || Date.now() - since < BLOCKER_RETURN_NUDGE_MS) return;
-    if (retracted || gone || read(NUDGED_KEY) === "1") return;
-    const id = window.setTimeout(() => {
-      remember(NUDGED_KEY, "1");
-      setReturned(true);
-      setOpen(true);
-    }, 1200);
-    return () => window.clearTimeout(id);
-  }, [away, retracted, gone]);
-
-  // Deep Focus folds the card back into the pill, and leaving it restores
-  // only what was there before: a card you closed by hand stays closed.
-  // Adjusted during render (React's pattern for reacting to a prop change),
-  // not in an effect, so there is no frame with the card still up.
-  const [wasOpen, setWasOpen] = useState(false);
-  const [prevRetracted, setPrevRetracted] = useState(retracted);
-  if (retracted !== prevRetracted) {
-    setPrevRetracted(retracted);
-    if (retracted) {
-      setWasOpen(open);
-      setOpen(false);
-    } else if (wasOpen) {
-      setOpen(true);
-    }
-  }
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  if (gone) return null;
-
-  return (
-    // Anchored to the room column (relative), not to the scroller: the
-    // corner stays put while the tiles scroll under it. Both states grow out
-    // of the same bottom-right corner.
-    <div lang={locale} className="absolute bottom-4 right-4 z-30">
-      {open ? (
-        <aside
-          aria-label={t.label}
-          className={`${CARD} w-[320px] max-w-[calc(100vw_-_32px)] shadow-[0_26px_56px_rgba(26,23,20,.26)] animate-wl-pop`}
-        >
-          <CardTop t={t} onClose={() => setOpen(false)} />
-          <CardActions
-            t={t}
-            locale={locale}
-            placement={returned ? "bubble-return" : "bubble"}
-            onDismiss={() => {
-              setOpen(false);
-              remember(BUBBLE_KEY, "1");
-            }}
-          />
-        </aside>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="flex h-14 items-center gap-3 rounded-full border border-[rgba(26,23,20,.08)] bg-[#fbf8f2] pl-[9px] pr-[22px] text-left shadow-[0_16px_34px_rgba(26,23,20,.2)] transition-[box-shadow,background-color] duration-200 hover:bg-white hover:shadow-[0_20px_42px_rgba(26,23,20,.28)] animate-wl-rise"
-        >
-          <Mark size={38} />
-          <span className="flex flex-col items-start leading-[1.22]">
-            <span className="text-[15px] font-bold tracking-[-0.015em] text-[#1a1714]">
-              {t.pillTitle}
-            </span>
-            <span className="text-[12.5px] text-[#7a7164]">{t.pillSub}</span>
-          </span>
-        </button>
-      )}
-    </div>
-  );
-}
-
 /* ------------------------------------------------------------------------- */
 
 export default function BlockerBanner({
-  variant = "sidebar",
+  variant = "banner",
   className = "",
   retracted = false,
   away = false,
   domain = "",
 }: {
-  /** sidebar = home right column · banner = bottom bar · bubble = in-room */
+  /** banner = the bottom bar (home) · dock = the rail and its pill (room) */
   variant?: Variant;
   className?: string;
-  /** bubble only: folded back into its pill by Deep Focus. */
+  /** dock only: retracted by Deep Focus. */
   retracted?: boolean;
-  /** bubble only: the tab is hidden — coming back may open the card. */
+  /** dock only: the tab is hidden — coming back may bring the rail out. */
   away?: boolean;
-  /** sidebar only: the reader's verified email domain, for their school's review. */
+  /** dock only: the reader's verified email domain, for their school's review. */
   domain?: string;
 }) {
   const locale = useBlockerLocale();
   const t = BLOCKER_STRINGS[locale];
-  if (variant === "bubble")
+  if (variant === "dock")
     return (
-      <Bubble locale={locale} t={t} retracted={retracted} away={away} />
+      <Dock
+        locale={locale}
+        t={t}
+        domain={domain}
+        retracted={retracted}
+        away={away}
+      />
     );
-  if (variant === "banner")
-    return <Banner locale={locale} t={t} className={className} />;
-  return (
-    <Sidebar locale={locale} t={t} domain={domain} className={className} />
-  );
+  return <Banner locale={locale} t={t} className={className} />;
 }

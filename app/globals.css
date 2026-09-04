@@ -380,6 +380,42 @@ html.wl-reduce *::after {
   }
 }
 
+/* The in-room promo rail, mirroring the crew sidebar on the other side: it
+   slides out on margin-right as one solid block (its 344px content never
+   re-lays-out), and `visibility` flips only at the END of the slide. The
+   retracted state is the bubble — a pill in the corner, rendered instead. */
+.wl-promorail {
+  width: 344px;
+  min-width: 344px;
+  overflow: hidden;
+  will-change: margin-right;
+  transition:
+    margin-right 0.45s cubic-bezier(0.2, 0.8, 0.3, 1),
+    border-color 0.3s cubic-bezier(0.2, 0.8, 0.3, 1),
+    visibility 0s linear 0s;
+}
+.wl-promoinner {
+  width: 344px;
+  min-width: 344px;
+  height: 100%;
+  overflow-y: auto;
+  /* Reserve the scrollbar gutter whether or not it is needed: the reviews
+     rotate through quotes of very different lengths, and a bar appearing
+     and vanishing every seven seconds would reflow the text under it. */
+  scrollbar-gutter: stable;
+  padding: 22px 22px 22px 14px;
+}
+.wl-promorail.wl-collapsed {
+  margin-right: -344px;
+  border-left-color: transparent;
+  /* Out of the tab order and the a11y tree once fully closed. */
+  visibility: hidden;
+  transition:
+    margin-right 0.45s cubic-bezier(0.2, 0.8, 0.3, 1),
+    border-color 0.3s cubic-bezier(0.2, 0.8, 0.3, 1),
+    visibility 0s linear 0.45s;
+}
+
 /* Room tiles grid: 3 cols, 6 compact cols in focus mode, 1 col on small screens. */
 .wl-grid {
   display: grid;

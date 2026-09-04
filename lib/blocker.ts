@@ -52,13 +52,9 @@ export function pickBlockerLocale(
   return "en";
 }
 
-// "bubble-return" is the bubble opened by its own return nudge, so that
-// click can be told apart from a tap on the pill.
-export type BlockerPlacement =
-  | "sidebar"
-  | "banner"
-  | "bubble"
-  | "bubble-return";
+// "dock-return" is the in-room rail brought out by its own return nudge, so
+// that click can be told apart from one on a rail the reader opened.
+export type BlockerPlacement = "banner" | "dock" | "dock-return";
 
 // Once a CTA has been clicked, the bar and the bubble stay quiet this long:
 // someone who has just gone to the download page does not need telling
@@ -127,20 +123,16 @@ export function blockerUrl(
 export type BlockerStrings = {
   /** Name of the landmark, for assistive tech. */
   label: string;
-  /** Bubble, folded: the two lines on the pill. */
+  /** The pill the rail retracts into: its two lines. */
   pillTitle: string;
   pillSub: string;
-  /** Card and banner. */
+  /** Banner. */
   headline: string;
-  /** Card. */
-  bullets: readonly [string, string];
   /** Banner. */
   subline: string;
-  /** Card CTA (→ the download page). */
-  download: string;
   /** Banner CTA (→ the download page). */
   start: string;
-  /** Card: gone for the session. */
+  /** Rail: gone for the session. */
   notNow: string;
   /** Close buttons (icon-only). */
   close: string;
@@ -155,13 +147,8 @@ export const BLOCKER_STRINGS: Record<BlockerLocale, BlockerStrings> = {
     pillTitle: "Too distracted?",
     pillSub: "Block it in one tap",
     headline: "Link every device. They all lock at the same time.",
-    bullets: [
-      "Apps, sites and notifications at once",
-      "Mac, PC, iPhone and iPad together",
-    ],
     subline:
       "Five difficulty levels, up to a lock nothing lifts before the date you set.",
-    download: "Download free",
     start: "Start a session",
     notNow: "Not now",
     close: "Close",
@@ -171,13 +158,8 @@ export const BLOCKER_STRINGS: Record<BlockerLocale, BlockerStrings> = {
     pillTitle: "Trop de distractions ?",
     pillSub: "Bloquez-les d'un geste",
     headline: "Reliez tous vos appareils. Ils se verrouillent en même temps.",
-    bullets: [
-      "Applis, sites et notifications d'un coup",
-      "Mac, PC, iPhone et iPad ensemble",
-    ],
     subline:
       "Cinq niveaux de sévérité, jusqu'au verrou que rien ne lève avant la date que vous fixez.",
-    download: "Télécharger gratuitement",
     start: "Lancer une session",
     notNow: "Pas maintenant",
     close: "Fermer",
@@ -187,13 +169,8 @@ export const BLOCKER_STRINGS: Record<BlockerLocale, BlockerStrings> = {
     pillTitle: "¿Demasiadas distracciones?",
     pillSub: "Bloquéalas con un toque",
     headline: "Conecta todos tus dispositivos. Se bloquean a la vez.",
-    bullets: [
-      "Apps, sitios y notificaciones de una vez",
-      "Mac, PC, iPhone y iPad juntos",
-    ],
     subline:
       "Cinco niveles de dureza, hasta un bloqueo que nada quita antes de la fecha que fijes.",
-    download: "Descargar gratis",
     start: "Empezar una sesión",
     notNow: "Ahora no",
     close: "Cerrar",
@@ -203,13 +180,8 @@ export const BLOCKER_STRINGS: Record<BlockerLocale, BlockerStrings> = {
     pillTitle: "Zu abgelenkt?",
     pillSub: "Mit einem Tipp sperren",
     headline: "Verbinde alle deine Geräte. Sie sperren sich gleichzeitig.",
-    bullets: [
-      "Apps, Websites und Benachrichtigungen auf einmal",
-      "Mac, PC, iPhone und iPad zusammen",
-    ],
     subline:
       "Fünf Schwierigkeitsstufen, bis zur Sperre, die vor deinem Datum nichts aufhebt.",
-    download: "Kostenlos herunterladen",
     start: "Session starten",
     notNow: "Jetzt nicht",
     close: "Schließen",
@@ -219,13 +191,8 @@ export const BLOCKER_STRINGS: Record<BlockerLocale, BlockerStrings> = {
     pillTitle: "Muitas distrações?",
     pillSub: "Bloqueie tudo com um toque",
     headline: "Conecte todos os seus aparelhos. Eles travam ao mesmo tempo.",
-    bullets: [
-      "Apps, sites e notificações de uma vez",
-      "Mac, PC, iPhone e iPad juntos",
-    ],
     subline:
       "Cinco níveis de rigor, até uma trava que nada libera antes da data que você definir.",
-    download: "Baixar grátis",
     start: "Começar uma sessão",
     notNow: "Agora não",
     close: "Fechar",
@@ -235,13 +202,8 @@ export const BLOCKER_STRINGS: Record<BlockerLocale, BlockerStrings> = {
     pillTitle: "ध्यान भटक रहा है?",
     pillSub: "एक टैप में ब्लॉक करें",
     headline: "हर डिवाइस जोड़ें। सब एक साथ लॉक हो जाते हैं।",
-    bullets: [
-      "ऐप्स, साइटें और नोटिफ़िकेशन एक साथ",
-      "Mac, PC, iPhone और iPad एक साथ",
-    ],
     subline:
       "लॉक के पाँच स्तर, यहाँ तक कि ऐसा लॉक जो आपकी तय तारीख़ से पहले किसी से नहीं खुलता।",
-    download: "मुफ़्त डाउनलोड करें",
     start: "सेशन शुरू करें",
     notNow: "अभी नहीं",
     close: "बंद करें",

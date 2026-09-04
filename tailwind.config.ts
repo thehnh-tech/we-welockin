@@ -75,11 +75,7 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(-10px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
-        // Blocker promo: the card popping out of its pill, the bar sliding up.
-        "wl-pop": {
-          from: { opacity: "0", transform: "translateY(10px) scale(.97)" },
-          to: { opacity: "1", transform: "none" },
-        },
+        // Blocker promo: the bar sliding up from the bottom of the page.
         "wl-up": {
           from: { opacity: "0", transform: "translateY(100%)" },
           to: { opacity: "1", transform: "none" },
@@ -90,7 +86,6 @@ const config: Config = {
         "wl-eq": "wl-eq .8s ease-in-out infinite",
         "wl-rise": "wl-rise .3s cubic-bezier(.2,.8,.3,1) both",
         "wl-toast": "wl-toast .25s cubic-bezier(.2,.8,.3,1) both",
-        "wl-pop": "wl-pop .28s cubic-bezier(.2,.8,.2,1) both",
         "wl-up": "wl-up .42s cubic-bezier(.2,.8,.2,1) both",
       },
     },

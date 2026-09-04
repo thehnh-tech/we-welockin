@@ -13,8 +13,12 @@ import { createRoot, type Root } from "react-dom/client";
 import BlockerBanner from "./BlockerBanner";
 
 // Behaviour of the promo as rendered, without a browser: the language it
-// picks, what each shape shows, and what a click, Escape, Deep Focus or a
-// dismissal does to it.
+// picks, what the unit shows, and what a click, Deep Focus, a spell away or
+// a dismissal does to it.
+//
+// jsdom answers no to every media query, so the rail is never "narrow" here
+// and starts open — the collapsed cases below get there by hand or through
+// Deep Focus, which is what a reader on a laptop would do.
 //
 // Dismissals are remembered at module level (on top of storage), so the
 // tests that dismiss come last, in their own block.
@@ -42,11 +46,15 @@ function click(el: Element | null) {
   });
 }
 
+const unit = () => container.querySelector("aside");
+const rail = () => container.querySelector(".wl-promorail");
+const collapsed = () => !!rail()?.classList.contains("wl-collapsed");
 const pill = () =>
   [...container.querySelectorAll("button")].find((b) =>
     b.textContent?.includes("Too distracted?")
   ) ?? null;
-const card = () => container.querySelector("aside");
+const retractButton = () => unit()!.querySelector('button[aria-label="Close"]');
+const cta = () => unit()!.querySelector("a")!;
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -70,34 +78,32 @@ afterEach(() => {
 describe("language", () => {
   it("speaks the browser's language and links to that language's pages", () => {
     setLanguages(["de-CH", "en"]);
-    render({ variant: "sidebar" });
-    const aside = card()!;
-    expect(aside.getAttribute("lang")).toBe("de");
-    expect(aside.getAttribute("aria-label")).toBe("welock.in App-Blocker");
-    expect(aside.textContent).toContain("Schluss mit Scrollen");
-    const cta = aside.querySelector("a")!;
-    expect(cta.getAttribute("href")).toMatch(
+    render({ variant: "dock" });
+    expect(unit()!.getAttribute("lang")).toBe("de");
+    expect(unit()!.getAttribute("aria-label")).toBe("welock.in App-Blocker");
+    expect(unit()!.textContent).toContain("Schluss mit Scrollen");
+    expect(cta().getAttribute("href")).toMatch(
       /^https:\/\/www\.welock\.in\/de\/download\?utm_/
     );
-    expect(cta.getAttribute("hreflang")).toBe("de");
-    expect(cta.getAttribute("rel")).toBe("noopener");
-    expect(cta.getAttribute("target")).toBe("_blank");
+    expect(cta().getAttribute("hreflang")).toBe("de");
+    expect(cta().getAttribute("rel")).toBe("noopener");
+    expect(cta().getAttribute("target")).toBe("_blank");
   });
 
   it("follows a language change without a reload", () => {
     render({ variant: "banner" });
-    expect(card()!.getAttribute("lang")).toBe("en");
+    expect(unit()!.getAttribute("lang")).toBe("en");
     setLanguages(["fr"]);
     act(() => {
       window.dispatchEvent(new Event("languagechange"));
     });
-    expect(card()!.getAttribute("lang")).toBe("fr");
-    expect(card()!.textContent).toContain("Reliez tous vos appareils");
+    expect(unit()!.getAttribute("lang")).toBe("fr");
+    expect(unit()!.textContent).toContain("Reliez tous vos appareils");
   });
 });
 
-describe("sidebar", () => {
-  const figure = () => card()!.querySelector("figure")!;
+describe("the unit", () => {
+  const figure = () => unit()!.querySelector("figure")!;
 
   // A day whose count since the epoch is a multiple of seven, so the daily
   // start lands on the first review and the expectations below hold.
@@ -109,29 +115,28 @@ describe("sidebar", () => {
   });
 
   it("shows the headline, three bullets, the CTA and the first review", () => {
-    render({ variant: "sidebar" });
-    const aside = card()!;
-    expect(aside.textContent).toContain("Stop scrolling");
-    expect(aside.querySelectorAll("ul > li")).toHaveLength(3);
-    expect(aside.querySelector("a")!.getAttribute("href")).toMatch(
-      /^https:\/\/www\.welock\.in\/download\?utm_.*utm_content=sidebar$/
+    render({ variant: "dock" });
+    expect(unit()!.textContent).toContain("Stop scrolling");
+    expect(unit()!.querySelectorAll("ul > li")).toHaveLength(3);
+    expect(cta().getAttribute("href")).toMatch(
+      /^https:\/\/www\.welock\.in\/download\?utm_.*utm_content=dock$/
     );
     expect(figure().textContent).toContain("Sarah Fourati");
     expect(figure().querySelector("img")!.getAttribute("src")).toBe(
       "/images/blocker/people/sarah-fourati.webp"
     );
     expect(
-      aside.querySelectorAll('button[aria-label^="Show review"]')
+      unit()!.querySelectorAll('button[aria-label^="Show review"]')
     ).toHaveLength(7);
   });
 
   it("rotates every seven seconds, and a dot stops it on the review picked", () => {
-    render({ variant: "sidebar" });
+    render({ variant: "dock" });
     act(() => {
       vi.advanceTimersByTime(7000);
     });
     expect(figure().textContent).toContain("Karim Assaf");
-    click(card()!.querySelector('button[aria-label="Show review 5"]'));
+    click(unit()!.querySelector('button[aria-label="Show review 5"]'));
     expect(figure().textContent).toContain("Selim Msallem");
     act(() => {
       vi.advanceTimersByTime(21000);
@@ -142,7 +147,7 @@ describe("sidebar", () => {
   it("never rotates under the app's reduced-motion setting", () => {
     document.documentElement.classList.add("wl-reduce");
     try {
-      render({ variant: "sidebar" });
+      render({ variant: "dock" });
       act(() => {
         vi.advanceTimersByTime(14000);
       });
@@ -153,70 +158,94 @@ describe("sidebar", () => {
   });
 
   it("leads with the reader's own school, then schools in their language", () => {
-    render({ variant: "sidebar", domain: "student.epfl.ch" });
+    render({ variant: "dock", domain: "student.epfl.ch" });
     expect(figure().textContent).toContain("Selim Haouala");
     expect(figure().textContent).toContain("EPFL");
 
     act(() => root.unmount());
     root = createRoot(container);
     setLanguages(["de-AT"]);
-    render({ variant: "sidebar" });
+    render({ variant: "dock" });
     expect(figure().textContent).toContain("Karim Assaf");
   });
 
   it("starts the day's review somewhere else the next day", () => {
     vi.setSystemTime(new Date("2026-01-02T12:00:00Z"));
-    render({ variant: "sidebar" });
+    render({ variant: "dock" });
     expect(figure().textContent).toContain("Karim Assaf");
   });
 
   it("carries the reviews in the reader's language too", () => {
     setLanguages(["fr"]);
-    render({ variant: "sidebar" });
+    render({ variant: "dock" });
     expect(figure().textContent).toContain("Master en Management");
-    expect(figure().textContent).toContain("« Une appli qui change vraiment la vie");
+    expect(figure().textContent).toContain(
+      "« Une appli qui change vraiment la vie"
+    );
   });
 });
 
-describe("bubble", () => {
-  it("starts as a pill and opens into the card", () => {
-    render({ variant: "bubble" });
-    expect(pill()).not.toBeNull();
-    expect(card()).toBeNull();
-    click(pill());
+describe("the rail and its pill", () => {
+  it("starts out, and the cross retracts it into the pill", () => {
+    render({ variant: "dock" });
+    expect(collapsed()).toBe(false);
     expect(pill()).toBeNull();
-    expect(card()!.textContent).toContain("Link every device");
+
+    click(retractButton());
+    expect(collapsed()).toBe(true);
+    expect(pill()).not.toBeNull();
+    // The unit stays mounted behind the slide, out of the a11y tree.
+    expect(rail()!.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("folds back on Escape and on the cross", () => {
-    render({ variant: "bubble" });
+  it("comes back from the pill, tagged as the rail again", () => {
+    render({ variant: "dock" });
+    click(retractButton());
     click(pill());
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    });
-    expect(card()).toBeNull();
-    expect(pill()).not.toBeNull();
-
-    click(pill());
-    click(card()!.querySelector('button[aria-label="Close"]'));
-    expect(card()).toBeNull();
-    expect(pill()).not.toBeNull();
+    expect(collapsed()).toBe(false);
+    expect(pill()).toBeNull();
+    expect(cta().getAttribute("href")).toContain("utm_content=dock");
   });
 
-  it("is folded by Deep Focus and restored only if it was open before", () => {
-    render({ variant: "bubble", retracted: false });
-    click(pill());
-    render({ variant: "bubble", retracted: true });
-    expect(card()).toBeNull();
-    expect(pill()).not.toBeNull();
-    render({ variant: "bubble", retracted: false });
-    expect(card()).not.toBeNull();
+  it("starts as a pill where the room is too narrow for it", () => {
+    const real = window.matchMedia;
+    window.matchMedia = ((q: string) => ({
+      matches: q.includes("1199"),
+      media: q,
+      addEventListener() {},
+      removeEventListener() {},
+    })) as unknown as typeof window.matchMedia;
+    try {
+      render({ variant: "dock" });
+      expect(collapsed()).toBe(true);
+      expect(pill()).not.toBeNull();
+      // A tap pins it open, width notwithstanding.
+      click(pill());
+      expect(collapsed()).toBe(false);
+    } finally {
+      window.matchMedia = real;
+    }
+  });
 
-    // Closed by hand before Deep Focus: stays closed after it.
-    click(card()!.querySelector('button[aria-label="Close"]'));
-    render({ variant: "bubble", retracted: true });
-    render({ variant: "bubble", retracted: false });
-    expect(card()).toBeNull();
+  it("is retracted by Deep Focus, pill and all", () => {
+    render({ variant: "dock", retracted: false });
+    render({ variant: "dock", retracted: true });
+    expect(collapsed()).toBe(true);
+    // Deep Focus is an empty screen: not even the pill stays.
+    expect(pill()).toBeNull();
+  });
+
+  it("leaving Deep Focus restores only what was there before", () => {
+    render({ variant: "dock", retracted: false });
+    render({ variant: "dock", retracted: true });
+    render({ variant: "dock", retracted: false });
+    expect(collapsed()).toBe(false);
+
+    // Retracted by hand before Deep Focus: stays a pill after it.
+    click(retractButton());
+    render({ variant: "dock", retracted: true });
+    render({ variant: "dock", retracted: false });
+    expect(collapsed()).toBe(true);
     expect(pill()).not.toBeNull();
   });
 });
@@ -224,10 +253,9 @@ describe("bubble", () => {
 describe("banner", () => {
   it("renders the bar with its spacer, landmark and localized links", () => {
     render({ variant: "banner" });
-    const aside = card()!;
-    expect(aside.getAttribute("aria-label")).toBe("welock.in app blocker");
-    expect(aside.textContent).toContain("Five difficulty levels");
-    const links = [...aside.querySelectorAll("a")].map((a) =>
+    expect(unit()!.getAttribute("aria-label")).toBe("welock.in app blocker");
+    expect(unit()!.textContent).toContain("Five difficulty levels");
+    const links = [...unit()!.querySelectorAll("a")].map((a) =>
       a.getAttribute("href")
     );
     expect(links[0]).toMatch(/^https:\/\/www\.welock\.in\/\?utm_/);
@@ -240,130 +268,112 @@ describe("banner", () => {
 // Dismissals and nudges last: they are remembered for the rest of the
 // module's life, in the order below.
 describe("dismissals", () => {
-  it("bubble: a short hop off the tab is not a distraction", () => {
+  it("a short hop off the tab is not a distraction", () => {
     vi.useFakeTimers();
     try {
-      render({ variant: "bubble", away: false });
-      render({ variant: "bubble", away: true });
+      render({ variant: "dock" });
+      click(retractButton());
+      render({ variant: "dock", away: true });
       act(() => {
         vi.advanceTimersByTime(20_000);
       });
-      render({ variant: "bubble", away: false });
+      render({ variant: "dock", away: false });
       act(() => {
         vi.advanceTimersByTime(5_000);
       });
-      expect(card()).toBeNull();
-      expect(pill()).not.toBeNull();
+      expect(collapsed()).toBe(true);
       expect(sessionStorage.getItem("wlis_blocker_nudged_v1")).toBeNull();
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("bubble: opens by itself, once, a beat after a minute or more away", () => {
+  it("a retracted rail comes out by itself, once, after a minute away", () => {
     vi.useFakeTimers();
     try {
-      render({ variant: "bubble", away: false });
-      render({ variant: "bubble", away: true });
+      render({ variant: "dock" });
+      click(retractButton());
+      render({ variant: "dock", away: true });
       act(() => {
         vi.advanceTimersByTime(61_000);
       });
-      render({ variant: "bubble", away: false });
-      expect(card()).toBeNull();
+      render({ variant: "dock", away: false });
+      expect(collapsed()).toBe(true);
       act(() => {
         vi.advanceTimersByTime(1_200);
       });
-      expect(card()).not.toBeNull();
-      expect(card()!.querySelector("a")!.getAttribute("href")).toContain(
-        "utm_content=bubble-return"
-      );
+      expect(collapsed()).toBe(false);
+      expect(cta().getAttribute("href")).toContain("utm_content=dock-return");
       expect(sessionStorage.getItem("wlis_blocker_nudged_v1")).toBe("1");
 
-      // Once per session: a second return does nothing.
-      click(card()!.querySelector('button[aria-label="Close"]'));
-      render({ variant: "bubble", away: true });
+      // Once per session: a second return leaves it alone.
+      click(retractButton());
+      render({ variant: "dock", away: true });
       act(() => {
         vi.advanceTimersByTime(61_000);
       });
-      render({ variant: "bubble", away: false });
+      render({ variant: "dock", away: false });
       act(() => {
         vi.advanceTimersByTime(5_000);
       });
-      expect(card()).toBeNull();
-      expect(pill()).not.toBeNull();
+      expect(collapsed()).toBe(true);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("bubble: not in Deep Focus", () => {
-    // The nudge flag is set by now; this checks the fold itself wins.
-    vi.useFakeTimers();
-    try {
-      render({ variant: "bubble", away: true, retracted: true });
-      act(() => {
-        vi.advanceTimersByTime(61_000);
-      });
-      render({ variant: "bubble", away: false, retracted: true });
-      act(() => {
-        vi.advanceTimersByTime(5_000);
-      });
-      expect(card()).toBeNull();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("bubble: Not now removes it for the session", () => {
-    render({ variant: "bubble" });
-    click(pill());
+  it("dock: Not now takes it away for the session, pill included", () => {
+    render({ variant: "dock" });
     click(
-      [...card()!.querySelectorAll("button")].find((b) =>
+      [...unit()!.querySelectorAll("button")].find((b) =>
         b.textContent?.includes("Not now")
       ) ?? null
     );
-    expect(card()).toBeNull();
+    expect(unit()).toBeNull();
     expect(pill()).toBeNull();
-    expect(sessionStorage.getItem("wlis_blocker_bubble_v1")).toBe("1");
+    expect(sessionStorage.getItem("wlis_blocker_dock_v1")).toBe("1");
     expect(localStorage.getItem("wlis_blocker_banner_v1")).toBeNull();
   });
 
   it("banner: the cross closes it for good", () => {
     render({ variant: "banner" });
-    click(card()!.querySelector('button[aria-label="Close"]'));
-    expect(card()).toBeNull();
+    click(unit()!.querySelector('button[aria-label="Close"]'));
+    expect(unit()).toBeNull();
     expect(container.querySelector('div[aria-hidden="true"]')).toBeNull();
     expect(localStorage.getItem("wlis_blocker_banner_v1")).toBe("1");
   });
 
-  it("a CTA click quiets the bar and the bubble, and warms the site first", () => {
+  it("a CTA click quiets both placements, and warms the site first", async () => {
+    // A fresh copy of the module: the dismissals above are held in its own
+    // memory as well as in storage, and this needs a promo left to click.
+    vi.resetModules();
+    const Fresh = (await import("./BlockerBanner")).default;
+    const render = (props: Parameters<typeof BlockerBanner>[0]) =>
+      act(() => {
+        root.render(createElement(Fresh, props));
+      });
     // jsdom has no navigation; keep the click from trying.
     container.addEventListener("click", (e) => e.preventDefault());
-    render({ variant: "sidebar" });
-    const cta = card()!.querySelector("a")!;
+    render({ variant: "dock" });
     act(() => {
-      (cta as HTMLElement).focus();
+      (cta() as HTMLElement).focus();
     });
     expect(
       document.head.querySelector(
         'link[rel="preconnect"][href="https://www.welock.in"]'
       )
     ).not.toBeNull();
-    click(cta);
+    click(cta());
     expect(localStorage.getItem("wlis_blocker_quiet_v1")).toMatch(/^\d+$/);
 
     act(() => root.unmount());
     root = createRoot(container);
     render({ variant: "banner" });
-    expect(card()).toBeNull();
+    expect(unit()).toBeNull();
     act(() => root.unmount());
     root = createRoot(container);
-    render({ variant: "bubble" });
+    render({ variant: "dock" });
+    expect(unit()).toBeNull();
     expect(pill()).toBeNull();
-    // The sidebar is page furniture and stays.
-    act(() => root.unmount());
-    root = createRoot(container);
-    render({ variant: "sidebar" });
-    expect(card()).not.toBeNull();
   });
 });

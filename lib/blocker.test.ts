@@ -59,18 +59,20 @@ describe("blockerUrl", () => {
   });
 
   it("sends the download CTA to the localized download page", () => {
-    expect(blockerUrl("de", "download", "bubble", origin)).toMatch(
+    expect(blockerUrl("de", "download", "dock", origin)).toMatch(
       new RegExp(`^${origin}/de/download\\?`)
     );
-    expect(blockerUrl("en", "download", "sidebar", origin)).toMatch(
+    expect(blockerUrl("en", "download", "dock", origin)).toMatch(
       new RegExp(`^${origin}/download\\?`)
     );
   });
 
   it("tags each placement so analytics can tell them apart", () => {
     const content = (u: string) => new URL(u).searchParams.get("utm_content");
-    expect(content(blockerUrl("en", "home", "bubble", origin))).toBe("bubble");
-    expect(content(blockerUrl("en", "home", "sidebar", origin))).toBe("sidebar");
+    expect(content(blockerUrl("en", "home", "dock", origin))).toBe("dock");
+    expect(content(blockerUrl("en", "home", "dock-return", origin))).toBe(
+      "dock-return"
+    );
   });
 
   it("defaults to welock.in's canonical host (www, https, no trailing slash)", () => {
@@ -91,16 +93,6 @@ describe("BLOCKER_STRINGS", () => {
           expect(v, `${locale}.${key}`).toBeTypeOf("string");
           expect(v.trim().length, `${locale}.${key}`).toBeGreaterThan(0);
         }
-      }
-      expect(t.bullets).toHaveLength(2);
-    }
-  });
-
-  it("keeps the platform names untranslated", () => {
-    for (const locale of BLOCKER_LOCALES) {
-      const devices = BLOCKER_STRINGS[locale].bullets[1];
-      for (const name of ["Mac", "PC", "iPhone", "iPad"]) {
-        expect(devices, locale).toContain(name);
       }
     }
   });

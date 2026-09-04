@@ -517,13 +517,14 @@ function RoomInner() {
           </div>
         </header>
 
-        {/* Deep Focus folds it back into its pill: the point of Deep Focus
-            is an empty screen, so the one promo on it gets out of the way
-            first. `away` lets it open by itself, once, when someone comes
-            back after a while off the tab. */}
-        <BlockerBanner variant="bubble" retracted={deep} away={away} />
-
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* The room and the promo rail, side by side: the rail is part of
+            the row, so opening it reflows the tiles instead of covering
+            them. Deep Focus retracts it — the point of Deep Focus is an
+            empty screen, so the one promo on it goes first — and `away`
+            brings it back out, once, when someone returns after a while off
+            the tab. */}
+        <div className="flex min-h-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-y-auto">
         {banner && (
           <div
             role="status"
@@ -688,6 +689,13 @@ function RoomInner() {
             );
           })}
         </div>
+        </div>
+        <BlockerBanner
+          variant="dock"
+          retracted={deep}
+          away={away}
+          domain={verify.domain}
+        />
         </div>
       </main>
     </div>
